@@ -40,9 +40,13 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
   `nDiaSources > 10`, and writes/registers a small subset for the rest of the workshop to use.
   Also demonstrates converting a catalog to pandas/numpy and building a long-format
   light-curve table via `explode`.
+- `notebooks/02_lc_histograms.ipynb` — `nDiaSources` histograms, plus per-object light-curve
+  statistics (duration, cadence gap, per-band robust amplitude) computed from the nested
+  `diaSource` column via `lsdb.Catalog.map_rows`. Writes the stats back as new columns on a
+  derived HATS collection (`dia_object_lc_10plus_with_stats`), not a separate side table.
 
-More notebooks (light-curve statistics, color-magnitude diagrams, period finding) are being
-added following the rough plan in `docs/SPEC_V01.md`.
+More notebooks (color-magnitude diagrams, period finding) are being added following the
+rough plan in `docs/SPEC_V01.md`.
 
 ## Documentation
 

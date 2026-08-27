@@ -14,4 +14,21 @@ artifacts:
     type: dp2_subset
     updated_at: '2026-08-27T18:13:42+00:00'
     updated_by: shrra-ung
+  dia_object_lc_10plus_with_stats:
+    format: hats-collection
+    hash: sha256:84491cdb800320350055fa74be1fc6ce759b3d2a54fd38567ed550476ae4c448
+    inputs:
+    - dia_object_lc_10plus
+    notes: dia_object_lc_10plus plus duration_days, median_cadence_gap_days (all bands)
+      and {band}_amp_p90p10 (per band, scienceMag) columns, from nb_02.
+    path: dia_object_lc_10plus_with_stats/collection.properties
+    root: dp2_subset
+    tags:
+    - diaobject
+    - dp2
+    - lc-stats
+    - nb02
+    type: dp2_subset
+    updated_at: '2026-08-27T18:50:13+00:00'
+    updated_by: shrra-ung
 registry_version: 1
