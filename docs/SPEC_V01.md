@@ -31,4 +31,21 @@
 - **Visual spot-checking**.
     - *Problem:* We don't know what to expect from the data yet, so we need to have a look - but efficiently, to cover a lot of ground in the time that we have.
     - *Solution:* Interactive scatter plots with LC plotting upon clicking on the data point; multipanel LC plotter.
-    - *TODO before workshop:* Implement the major visualization functions. Warning: interactive stuff will behave differently in Jupyter and in VSCode or other IDEs; write functions for both cases.
+    - *TODO before workshop:* Implement the major visualization functions. Warning: interactive stuff will behave differently in Jupyter and in VSCode or other IDEs; consider writing functions for both cases, but Jupyter (for RSP) is the priority.
+
+## Rough plan
+
+1) nb_01: Prepare a DP2 subset to play with. Select several partitions in different sky areas (exact list to be determined, but something low- and high-latitude and low- and high-number of observations, to account for galactic/extragalactic sources and for different distribution of cadence gaps. So, preliminary, 4 partitions). Select only objects with >10 nDiaSources, save this new collection to a DATA folder, register the new location with datapaths.  Separate sections: show how to convert it to numpy and pandas DFs (omitting nested columns), and how to create LCs tables (`partition.explode` in `lsdb`).
+2) nb_02: LCs properties histograms:
+ - Plot historgrams for nDiaSources for each partition.
+ - Get statistics histograms for LCs (probably using nested columns and `map_rows` from `lsdb`): 
+ 	- LCs durations in days, 
+ 	- min/max/median/robust-amplitude (with outliers discarded) flux values,
+ 	- if transient event detected: rise/fall/total duration time, location of the peak
+ 	- median cadence gap in days.
+ - To think: for diaObject we have diff fluxes, not absolute values, so plotting histograms for min/max/median flux values won't be particularly informative. TBD whether to use those anyway, or convert them to mags somehow, or to have a crossmatch with Object catalog, or something else. We also can't easily use colors on LCs, because the cadence of different bands does not coincide, and we don't want to do model fitting just yet. 
+ - Save statistics for LCs into the collection - no need to recompute them every time. (datapaths structure for this repo is TBD)
+ 3) nb_03: color-mag and color-color plots. 
+ 4) nb_04: Lomb-Scargle periods. Run on each partition, using information about LCs durations to determine top boundary for period search. Measure execution time. Save calculated periods.
+ 5) nb_05: Plot period-amplitude diagrams.
+ 6) For plotting any scatter plots (e.g. period-amplitude, color-magnitude diagrams): implement interactive function that plots the scatter plot in the left panel, and upon clicking on the data shows it's LC on the right. The function accepts the dataset for the scatter plot, the columns to plot, the dataset with the LCs (not guaranteed that the first dataset will be a HATS with nested columns, but it is assumed that both datasets have the same object id columns), the list of bands to plot (default 'ugriz', without 'y'), and the periods column (probably other arguments TBD later). The LC plotting panel should have two toggles - to plot folded or not folded LCs, and to show/hide flux errors.
