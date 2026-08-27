@@ -34,11 +34,12 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
 
 ## Notebooks
 
-- `notebooks/01_read_diaObj.ipynb` — selects a handful of `diaObject` HATS partitions spanning
-  different galactic latitudes and cadences, filters to objects with `nDiaSources > 10`, and
-  writes/registers a small (~700 MB) subset for the rest of the workshop to use. Also
-  demonstrates converting a catalog to pandas/numpy and building a long-format light-curve
-  table via `explode`.
+- `notebooks/01_read_diaObj.ipynb` — visualizes the DP2 `diaObject` footprint (coverage map
+  via `plot_pixels()`, plus a depth/cadence map built from r-band visit counts), lets you pick
+  fields by eye as plain `(ra, dec)` coordinates, pulls each out with `cone_search`, filters to
+  `nDiaSources > 10`, and writes/registers a small subset for the rest of the workshop to use.
+  Also demonstrates converting a catalog to pandas/numpy and building a long-format
+  light-curve table via `explode`.
 
 More notebooks (light-curve statistics, color-magnitude diagrams, period finding) are being
 added following the rough plan in `docs/SPEC_V01.md`.

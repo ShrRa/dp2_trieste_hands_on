@@ -1,10 +1,10 @@
 artifacts:
   dia_object_lc_10plus:
     format: hats-collection
-    hash: sha256:9bf5b115999211243d05db8dfd7017cbcea33b24284bce1a53fda0eb0dcfb942
+    hash: sha256:68ec6afc7b46b6e8d3bf778c406789726a24b2b89871e77aaee1ef884016fa5b
     inputs: []
-    notes: '4 diaObject partitions (order 7), nDiaSources > 10: 2 low/high galactic
-      latitude x 2 low/high cadence (max nDiaSources), see nb_01 section 3.'
+    notes: 5 fields picked by eye off the coverage/cadence maps, 0.3 deg cone_search
+      radius each, nDiaSources > 10, see nb_01 sections 2-4.
     path: dia_object_lc_10plus/collection.properties
     root: dp2_subset
     tags:
@@ -12,6 +12,6 @@ artifacts:
     - dp2
     - nb01
     type: dp2_subset
-    updated_at: '2026-08-27T16:10:23+00:00'
+    updated_at: '2026-08-27T18:13:42+00:00'
     updated_by: shrra-ung
 registry_version: 1
