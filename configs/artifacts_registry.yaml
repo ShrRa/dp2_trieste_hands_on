@@ -1,0 +1,17 @@
+artifacts:
+  dia_object_lc_10plus:
+    format: hats-collection
+    hash: sha256:68ec6afc7b46b6e8d3bf778c406789726a24b2b89871e77aaee1ef884016fa5b
+    inputs: []
+    notes: 5 fields picked by eye off the coverage/cadence maps, 0.3 deg cone_search
+      radius each, nDiaSources > 10, see nb_01 sections 2-4.
+    path: dia_object_lc_10plus/collection.properties
+    root: dp2_subset
+    tags:
+    - diaobject
+    - dp2
+    - nb01
+    type: dp2_subset
+    updated_at: '2026-08-27T18:13:42+00:00'
+    updated_by: shrra-ung
+registry_version: 1

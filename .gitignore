@@ -208,3 +208,6 @@ __marimo__/
 
 # Local roots config
 configs/roots.local.yaml
+
+# datapaths filelock artifact
+configs/*.lock
