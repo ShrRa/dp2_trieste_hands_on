@@ -9,6 +9,7 @@
 
 ## The non-goals:
 
+- No completeness analysis - for that we need to have full catalog and to make sure we're not missing something because of the margins, quality flags being overly cautious, etc.
 - Not crossmatch with other catalogs - that would require careful considerations of field crowdedness, separation limits, and detection quality. No time for this yet.
 - No model fitting at scale - same reason, time/resources.
 
