@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-08-29 (2)
+
+- Added `notebooks/04_periods.ipynb` (nb_04 from the rough plan): per-band Lomb-Scargle
+  periods via `astropy.timeseries.LombScargle`, `map_rows(..., append_columns=True)` on
+  `diaSource.midpointMjdTai`/`scienceMag`, same style as nb_02/nb_03. Longest findable period
+  bounded by nb_02's `duration_days / 2`; shortest left to `autopower`'s own defaults. Works on
+  nb_03's `dia_object_lc_10plus_with_mags`, output registered as
+  `dia_object_lc_10plus_with_periods`.
+  - Real-data finding: per-band point counts are much thinner than `nDiaSources` (the total
+    across all 6 bands) suggests — medians of `z`: 7, `i`: 3, `r`: 3, `g`: 2, `u`/`y`: 0 — so
+    with `MIN_POINTS_FOR_LS = 10`, only ~34% of objects get a period in any band, and `z`
+    dominates (not `r`, which nb_01 used as the depth/cadence proxy for picking these fields).
+  - Measured execution time per the spec's explicit ask: ~0.6 ms/object on this subset,
+    projecting to a naive ~38 hours (serial, single-machine) for `dia_object_collection`'s full
+    232,004,216 rows — flagged as an overestimate ceiling, not a real estimate, since most
+    full-collection objects have far fewer `diaSource` points than this `nDiaSources > 10`
+    subset and would fail the point threshold almost instantly.
+  - Folded the single highest-power object in the subset (`power=7.93`, `standard`
+    normalization can exceed 1) as a sanity check: ~0.05 mag of scatter, no visible periodic
+    shape — concrete evidence that peak power alone isn't a usable real/bogus signal here,
+    logged as an open question (needs a real false-alarm-probability pass).
+
 ## 2026-08-29
 
 - Revised `notebooks/03_color_mag_diagram.ipynb`'s plots and added quality cuts, per feedback

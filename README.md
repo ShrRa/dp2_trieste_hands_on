@@ -55,7 +55,14 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
   reachable through this LSDB HATS collection. Output registered as
   `dia_object_lc_10plus_with_mags`.
 
-More notebooks (period finding) are being added following the rough plan in
+- `notebooks/04_periods.ipynb` — per-band Lomb-Scargle periods (`astropy.timeseries.LombScargle`)
+  via `map_rows`, longest findable period bounded by nb_02's light-curve duration. Measures and
+  reports execution time (per the spec's ask), and folds the highest-power light curve as a
+  sanity check — which turns out to look like noise, not a real signal, underlining that peak
+  power alone isn't a usable real/bogus cut. Output registered as
+  `dia_object_lc_10plus_with_periods`.
+
+More notebooks (period-amplitude diagrams) are being added following the rough plan in
 `docs/SPEC_V01.md`.
 
 ## Documentation
