@@ -59,7 +59,9 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
   via `map_rows`, longest findable period bounded by nb_02's light-curve duration. Measures and
   reports execution time (per the spec's ask), and folds the highest-power light curve as a
   sanity check — which turns out to look like noise, not a real signal, underlining that peak
-  power alone isn't a usable real/bogus cut. Output registered as
+  power alone isn't a usable real/bogus cut. Also runs `LombScargleMultiband` (pooling all
+  bands per object) as a second pass: coverage jumps from ~34% to ~99.8% at ~59x the per-object
+  cost, and compares the two against each other. Output registered as
   `dia_object_lc_10plus_with_periods`.
 
 More notebooks (period-amplitude diagrams) are being added following the rough plan in

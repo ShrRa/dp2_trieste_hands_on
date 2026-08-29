@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-08-29 (3)
+
+- Added a multiband Lomb-Scargle section to `notebooks/04_periods.ipynb`
+  (`astropy.timeseries.LombScargleMultiband`, pooling all bands' epochs into one shared-period
+  fit instead of picking a single "best" band per object), addressing the "Next" item nb_04
+  originally left open.
+  - Coverage jumped from ~34% (best single band) to 99.8% (7020/7036) — expected, since
+    multiband only needs 10+ points combined across bands rather than in any one band, and
+    every object here already has 10+ total by construction (`nDiaSources > 10`).
+  - Much more expensive: ~35 ms/object vs. single-band's ~0.6 ms/object (~59x), projecting to a
+    naive ~2265-hour ceiling for the full 232M-row collection, vs. single-band's ~36 hours.
+  - Compared multiband periods against single-band `best_period_days` for the ~2400 objects with
+    both: broad agreement in a band around the 1:1 line from ~0.3-100 days, but a distinct group
+    of single-band periods under 0.1 day disagree sharply, landing multiband periods in the 1-4
+    day range instead — plausibly the single-band sub-0.1-day periods being spurious (few points,
+    no independent band to cross-check), though not independently vetted here.
+  - `multiband_period_power` stayed within `[0, 1]` as expected for `standard` normalization,
+    unlike single-band's occasional `>1` power (nb_04's original `power=7.93` noise example).
+  - Extended the same registered `dia_object_lc_10plus_with_periods` artifact in place rather
+    than creating a new one.
+
 ## 2026-08-29 (2)
 
 - Added `notebooks/04_periods.ipynb` (nb_04 from the rough plan): per-band Lomb-Scargle

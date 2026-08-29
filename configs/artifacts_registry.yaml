@@ -35,13 +35,13 @@ artifacts:
     updated_by: shrra-ung
   dia_object_lc_10plus_with_periods:
     format: hats-collection
-    hash: sha256:d948efa4fbd3399df73689e636d1f4ddc6f91a84b890055301f2da34bbc4d860
+    hash: sha256:afc9e467b29f48af2ad1128f851e8bc4c0652efc926641fed1415c0b7cbf4bd4
     inputs:
     - dia_object_lc_10plus_with_mags
     notes: dia_object_lc_10plus_with_mags plus {band}_period_days/{band}_period_power
-      (per band, Lomb-Scargle on diaSource.scienceMag, >=10 points required, max period
-      = duration_days/2) and best_period_days/best_period_power (highest-power band),
-      from nb_04.
+      (per band), best_period_days/best_period_power (highest-power single band),
+      and multiband_period_days/multiband_period_power (LombScargleMultiband across
+      all bands jointly), all from nb_04.
     path: dia_object_lc_10plus_with_periods/collection.properties
     root: dp2_subset
     tags:
@@ -51,7 +51,7 @@ artifacts:
     - nb04
     - periods
     type: dp2_subset
-    updated_at: '2026-08-29T15:19:57+00:00'
+    updated_at: '2026-08-29T15:45:27+00:00'
     updated_by: shrra-ung
   dia_object_lc_10plus_with_stats:
     format: hats-collection
