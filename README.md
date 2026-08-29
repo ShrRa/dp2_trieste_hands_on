@@ -44,9 +44,19 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
   statistics (duration, cadence gap, per-band robust amplitude) computed from the nested
   `diaSource` column via `lsdb.Catalog.map_rows`. Writes the stats back as new columns on a
   derived HATS collection (`dia_object_lc_10plus_with_stats`), not a separate side table.
+- `notebooks/03_color_mag_diagram.ipynb` — color-magnitude and color-color diagrams (`g-r` vs
+  `r`, and `g-r` vs `r-i`; bands are plain variables). Per-band magnitudes come from
+  `ForcedSourceOnDiaObject` (the nested `diaObjectForcedSource` column), aggregated per band
+  via `map_rows` with a quality cut (>=3 unflagged points per band), since `diaObject`'s own
+  columns are either difference-image-based or too sparsely populated to use directly, and a
+  crossmatch to the `Object` (coadd) table was ruled out (slow, ambiguous in crowded fields).
+  Also splits objects by `diaSource.reliability` (DP2's real/bogus score) as a stand-in for
+  the point-source/extended split `diaObject.extendedness` would give — that column isn't
+  reachable through this LSDB HATS collection. Output registered as
+  `dia_object_lc_10plus_with_mags`.
 
-More notebooks (color-magnitude diagrams, period finding) are being added following the
-rough plan in `docs/SPEC_V01.md`.
+More notebooks (period finding) are being added following the rough plan in
+`docs/SPEC_V01.md`.
 
 ## Documentation
 

@@ -14,6 +14,25 @@ artifacts:
     type: dp2_subset
     updated_at: '2026-08-27T18:13:42+00:00'
     updated_by: shrra-ung
+  dia_object_lc_10plus_with_mags:
+    format: hats-collection
+    hash: sha256:109c7233fb0d470e6346b6cce5b4225126707e190b21ab680e703da8a920e5a3
+    inputs:
+    - dia_object_lc_10plus_with_stats
+    notes: dia_object_lc_10plus_with_stats plus {band}_mag_median (per band, median
+      diaObjectForcedSource.psfMag, quality-flagged rows excluded, >=3 points required)
+      and max_reliability (max diaSource.reliability) columns, from nb_03.
+    path: dia_object_lc_10plus_with_mags/collection.properties
+    root: dp2_subset
+    tags:
+    - cmd
+    - diaobject
+    - dp2
+    - forced-photometry
+    - nb03
+    type: dp2_subset
+    updated_at: '2026-08-29T15:02:17+00:00'
+    updated_by: shrra-ung
   dia_object_lc_10plus_with_stats:
     format: hats-collection
     hash: sha256:84491cdb800320350055fa74be1fc6ce759b3d2a54fd38567ed550476ae4c448
