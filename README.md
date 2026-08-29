@@ -14,6 +14,13 @@ and outputs live without hardcoding machine-specific paths:
 pip install --user "datapaths[tabular] @ git+https://github.com/ShrRa/datapaths.git@main"
 ```
 
+nb_05's interactive plots need one more package not currently in the RSP kernel — `anywidget`,
+required by `plotly`'s `FigureWidget` as of plotly 6.x:
+
+```bash
+pip install --user anywidget
+```
+
 `datapaths` resolves paths through two files under `configs/`:
 
 - `artifacts_registry.yaml` — committed, tracks named artifacts (path, hash, notes).
@@ -64,8 +71,18 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
   cost, and compares the two against each other. Output registered as
   `dia_object_lc_10plus_with_periods`.
 
-More notebooks (period-amplitude diagrams) are being added following the rough plan in
-`docs/SPEC_V01.md`.
+- `notebooks/05_interactive_explorer.ipynb` — demos `interactive_scatter_lc`
+  (`src/visualization/lc_explorer.py`): click a point in a scatter plot (a CMD, a
+  period-amplitude diagram, anything keyed by an object id) to see that object's light curve on
+  the right, with toggles to fold on a period and to show/hide flux errors. Built on
+  `plotly.graph_objects.FigureWidget` + `ipywidgets`; needs a live Jupyter kernel with widget
+  support to actually click (not verified outside JupyterLab on RSP).
+
+`src/visualization/` holds reusable plotting code shared across notebooks (currently just
+`lc_explorer.py`). It isn't pip-installed on RSP — the pinned Python 3.14 here is newer than
+RSP's kernel (see above) — notebooks add `src/` to `sys.path` directly instead.
+
+More notebooks are being added following the rough plan in `docs/SPEC_V01.md`.
 
 ## Documentation
 

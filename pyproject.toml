@@ -21,6 +21,7 @@ dependencies = [
     "aioitertools==0.13.0",
     "aiosignal==1.4.0",
     "annotated-types==0.8.0",
+    "anywidget==0.11.0",
     "astropy==8.0.1",
     "astropy-iers-data==0.2026.8.24.0.24.29",
     "asttokens==3.0.2",
@@ -120,6 +121,7 @@ dependencies = [
     "prompt_toolkit==3.0.53",
     "propcache==0.5.2",
     "psutil==7.2.2",
+    "psygnal==0.15.1",
     "ptyprocess==0.7.0",
     "pure_eval==0.2.3",
     "py2vega==0.7.0",
@@ -170,7 +172,9 @@ dependencies = [
     "zipp==4.1.0",
 ]
 
-# No local package to build yet (src/io, src/visualization are still empty).
-# This keeps `pip install .` working as a pure dependency install.
+# src/visualization now has real code (the interactive scatter+LC explorer, nb_05); src/io is
+# still unused. On RSP, notebooks import this by adding `src/` to sys.path directly rather than
+# via `pip install .` — the pinned Python 3.14 here is newer than RSP's kernel (see README).
 [tool.setuptools]
-py-modules = []
+package-dir = {"" = "src"}
+packages = ["visualization"]

@@ -1,5 +1,90 @@
 # Changelog
 
+## 2026-08-29 (7)
+
+- Root cause of the "no light curve appears" report found: the user's actual call set `mag_col`/
+  `magerr_col` to `psfDiffFlux`/`psfDiffFluxErr` but left `nested_col` at its default
+  (`"diaSource"`) — those two columns only exist in `diaObjectForcedSource`, so `_fetch_lightcurve`
+  raised `KeyError: 'psfDiffFlux'` (confirmed by the user via RSP's log panel, not the notebook —
+  the previous "surface errors in the info line" fix hadn't taken effect for them yet, since
+  editing the `.py` file on disk doesn't retroactively patch an already-imported module in a
+  running kernel; needs a kernel restart or `importlib.reload` plus re-running the widget cell).
+  - Fixed `_fetch_lightcurve` to check `time_col`/`mag_col`/`band_col` against the chosen
+    `nested_col`'s actual columns upfront and raise a specific `KeyError` naming the missing
+    column, the nested column it was looked for in, and the full list of what's actually
+    available there — plus a direct hint ("...pass the matching nested_col=... too") for exactly
+    this mismatch, since a column living in a different nested table than the one selected is an
+    easy mistake to repeat.
+  - The scaling-artifact hypothesis from the previous entry no longer applies — this was always
+    a straightforward `KeyError`, not a rendering issue.
+
+## 2026-08-29 (6)
+
+- Investigated a report that no light curve appears after clicking a scatter point when
+  `interactive_scatter_lc` is configured with `nested_col="diaObjectForcedSource"`,
+  `mag_col="psfDiffFlux"`. Clicked all 6907 objects in a reconstructed repro programmatically
+  (via each trace's stored `_click_callbacks`, bypassing the need for a real browser) and found
+  zero exceptions — so whatever's happening isn't a crash in this exact configuration, at least
+  not one reproduced so far.
+  - Along the way, fixed a real bug regardless: the light-curve panel's y-axis was
+    unconditionally reversed (assuming a magnitude, smaller-is-brighter), which is wrong for a
+    flux-valued `mag_col` like `psfDiffFlux` — now only reverses when `"mag"` is in `mag_col`.
+  - Fixed a real diagnosability gap: ipywidgets silently swallows exceptions raised inside
+    `on_click`/`.observe()` callbacks (they don't appear anywhere in the notebook, only
+    potentially in the Jupyter server's terminal log) — `render()` now wraps its work in
+    try/except and surfaces any error into the info line above the light-curve panel, so a
+    future misconfiguration is visible instead of silently looking like "clicking does nothing".
+  - Root cause not yet confirmed; leading hypothesis is a visual scaling issue, not a bug: forced
+    photometry (`diaObjectForcedSource`) reports a value at every visit regardless of detection,
+    so a typical object's `psfDiffFlux` clusters near zero at most epochs with only the actual
+    detection epochs showing a real signal — a wide enough dynamic range on a linear axis could
+    visually squash the real light curve into what looks like a flat, empty line.
+
+## 2026-08-29 (5)
+
+- Fixed two `interactive_scatter_lc` (`src/visualization/lc_explorer.py`) display issues, per
+  user feedback after live-testing nb_05 on RSP:
+  - MJD tick labels on the light-curve panel's x-axis were showing plotly's default abbreviated
+    form (e.g. `60.88k`) instead of the full value — fixed with an explicit `tickformat=".2f"` +
+    `exponentformat="none"` on that axis.
+  - The band legend disappeared whenever only one band actually had data for the clicked object
+    (plotly defaults to hiding the legend when just one trace has non-empty data, even though
+    the other bands' traces still exist, just empty) — fixed with an explicit `showlegend=True`
+    on both the layout and each trace, overriding that default.
+  - Logged the `anywidget` failure and its resolution: `pip install --user anywidget` alone
+    didn't register the frontend module in the live RSP JupyterLab session (`Failed to load
+    model class 'AnyModel'`) — a browser reload fixed it, no code change needed. Also logged the
+    user's pointer to RSP's own interactive-plot tutorials
+    (`notebooks/tutorials/DP2/300_Science_demos/312_Interactive_plots`, bokeh + holoviews) as a
+    `docs/backlog.md` item for a possible future tech-stack refactor.
+
+## 2026-08-29 (4)
+
+- Added `src/visualization/lc_explorer.py` (`interactive_scatter_lc`), implementing
+  `docs/SPEC_V01.md`'s rough plan step 6: click a point in a scatter plot, see that object's
+  light curve on the right, with toggles to fold on a period and to show/hide flux errors. Built
+  on `plotly.graph_objects.FigureWidget` + `ipywidgets`, chosen over bokeh/bqplot/panel (all
+  already pinned in `pyproject.toml`) after checking with the user, given the priority on
+  reliable behavior in plain JupyterLab on RSP.
+  - `pyproject.toml`'s `[tool.setuptools]` now actually builds `src/visualization` as a package
+    (previously `py-modules = []`, with a comment noting it and `src/io` were still empty).
+  - Found plotly 6.x's `FigureWidget` requires `anywidget`, which wasn't in the pinned dependency
+    list and had to be installed separately (`pip install --user anywidget`) — added to both
+    `pyproject.toml` and `README.md`'s setup section.
+  - Found passing a categorical (string) column as `color_col` crashes plotly's continuous
+    `colorscale` machinery (`marker.color` requires numeric values for a colorscale) — fixed by
+    detecting non-numeric columns and mapping them to a discrete palette instead (no per-category
+    legend on a single trace, so the category rides along in the hover text instead).
+- Added `notebooks/05_interactive_explorer.ipynb`, demoing the function against nb_03's CMD and
+  nb_04's period-amplitude data. Can't verify the actual click-to-update behavior via
+  non-interactive `nbconvert --execute` (no simulated browser click) — only that the widgets
+  build without error; real verification needs a live RSP JupyterLab session.
+  - Found `jupyter nbconvert --execute --inplace` embeds a full widget-state snapshot in
+    `metadata.widgets` on save — ~21 MB for this notebook (the scatter data serialized into the
+    saved model), vs. ~11 KB without it. Stripped before committing (`nb["metadata"].pop
+    ("widgets", None)`), since that snapshot only exists for static viewers (nbviewer, GitHub)
+    and this notebook's whole point is being clicked live.
+
 ## 2026-08-29 (3)
 
 - Added a multiband Lomb-Scargle section to `notebooks/04_periods.ipynb`
