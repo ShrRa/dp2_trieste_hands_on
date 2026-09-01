@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-09-01 (6)
+
+- Refactored nb_02-05 to read and write **one shared collection** (`dia_object_lc_hq`) instead
+  of each spinning off its own `..._with_X` copy — per the user's report that disk quota was
+  being eaten fast: `dia_object_lc_hq` (17 GB), `dia_object_lc_hq_with_stats` (17 GB), and
+  `dia_object_lc_hq_with_mags` (15 GB) were all real, already on disk, each one a full copy of
+  everything before it, nested light curves included — by nb_04 the same light curves would
+  have existed on disk four times over (~66 GB for what's fundamentally one table gaining
+  columns).
+  - nb_02/nb_03/nb_04 (both passes) now write their new columns to a temporary path with
+    `resume=True`, then *promote* it — delete the current `dia_object_lc_hq`, rename the
+    temporary one into place — once the write actually completes, instead of writing to a
+    separate collection name. This is the same write-to-temp-then-promote pattern nb_04's
+    multiband pass already used to extend an existing collection in place; every heavy step
+    needs it now, not just multiband, since `dia_object_lc_hq` already has content by the time
+    any of nb_02/03/04 run (nb_01's base, plus whatever earlier notebooks already added) —
+    `resume=True` straight onto it would silently skip writing new columns for every pixel
+    that's already there, only checking whether a pixel's file exists, not whether it has the
+    columns the current run would add.
+  - All `dp.register()` calls in nb_02/03/04 now target the single name `dia_object_lc_hq`
+    (`overwrite_history=True`, as before) instead of `dia_object_lc_hq_with_stats`/`_with_mags`/
+    `_with_periods`; those three registry entries and artifact names are retired.
+  - Renamed the per-notebook lazy-catalog variable (`stats_cat`, `mags_cat`, `periods_cat`,
+    `cmd_cat`) to `hq_cat` everywhere, reflecting that every notebook now points at the same
+    physical/logical collection — reopening it at any point in any notebook reflects whatever
+    has actually been added so far, which may be more than that specific notebook's own
+    columns if later notebooks already ran.
+  - Verified the full nb_01→nb_02→nb_03→nb_04(single-band)→nb_04(multiband) chain end to end
+    against a real HQ partition, promoting into the *same* path five times in a row — final
+    collection has every expected column (light curves included) and reopens correctly.
+    Additionally extracted the four `map_partitions` functions verbatim from the actual
+    notebook files (not a hand-copied version) and re-ran the same chain against them
+    specifically, to rule out a transcription error during editing.
+  - Left the pre-existing `dia_object_lc_hq_with_stats`/`dia_object_lc_hq_with_mags`
+    directories (~32 GB combined) and the registry's now-stray `dia_object_lc_hq_with_stats`
+    entry alone rather than deleting/reverting them unasked — flagged to the user as the next
+    thing to clean up once they've confirmed the new code reproduces what's needed.
+
 ## 2026-09-01 (5)
 
 - Vectorized nb_02's `lc_stats_partition` and nb_03's `band_mags_partition` — replacing the
