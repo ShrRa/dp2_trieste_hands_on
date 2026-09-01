@@ -1,5 +1,60 @@
 # Changelog
 
+## 2026-09-01 (4)
+
+- Reworked nb_02/nb_03/nb_04's heavy-calculation cells from `map_rows(..., append_columns=True)`
+  onto `map_partitions`, per the user's own observation that the `.compute()` +
+  `lsdb.from_dataframe()` roundtrip the previous entry's `map_rows` version needed (a
+  workaround for a margin-cache-index bug, not something `map_rows` itself requires) forces
+  the *entire* ~399k-object HQ sample into memory at once and makes the write all-or-nothing —
+  risky, and not resumable.
+  - `map_partitions` hands the per-partition function a whole `nested_pandas.NestedFrame`
+    (nested columns stay nested, e.g. `row["diaSource"]["midpointMjdTai"]`, unlike `map_rows`'s
+    flattened `row["diaSource.midpointMjdTai"]` convention) and returns a genuinely lazy
+    `Catalog` — writing straight from it with `write_catalog(..., resume=True)` doesn't hit the
+    margin-cache bug (verified against real HQ data at both single- and 75-partition scale, not
+    just inferred), and `resume=True` — checked directly against the `lsdb`/`hats` source
+    (`lsdb/io/to_hats.py`), not just its docstring — genuinely tracks and skips already-written
+    pixels on a rerun, not just files.
+  - Kept the Dask `dask.distributed.Client` the user added to nb_02 (per LSDB's own
+    recommendation for this kind of computation) and added the same pattern to nb_03/nb_04,
+    closed after each notebook's last heavy cell.
+  - **`resume=True` only tracks which pixels exist on disk, not whether the mapped function
+    changed** — every notebook's heavy-flag markdown now calls this out: editing
+    `lc_stats_partition`/`band_mags_partition`/`band_periods_partition`/
+    `multiband_period_partition` and rerunning with `resume=True` silently keeps stale values
+    for any pixel already written under the old version. Delete the target collection (or pass
+    `overwrite=True`) for a clean rebuild after a function change.
+  - **nb_04's multiband pass (section 5) can't reuse `resume=True` in place**, since it *adds
+    columns* to the already-complete single-band collection at the same path — `resume=True`
+    would see those pixels' files already exist and skip writing the new multiband columns
+    entirely, silently. Section 5 now writes to a temporary path with `resume=True` (protecting
+    the ~4h-projected computation itself), then promotes it — delete the old collection,
+    rename the temp one into place — once the write actually completes; verified end-to-end at
+    small scale, including that the final collection carries every prior column (stats, mags,
+    single-band periods, and the nested light curves) plus the two new multiband ones, not just
+    the new columns.
+  - nb_04's execution-time measurement (the spec's explicit ask) now wraps the `write_catalog`
+    call itself rather than a separate `.compute()`, since that's what actually forces
+    computation now; object counts for the ms/object rate come from
+    `catalog.hc_structure.catalog_info.total_rows` (free, no data read) instead of `len()` on a
+    materialized frame.
+  - Caught and fixed a process-hygiene mistake while cleaning up after a test run in this
+    session: ran `pkill -f "dask worker"`, which killed a Dask cluster that turned out to
+    belong to the user's own long-running live JupyterLab kernel (a different process than
+    this session's `nbconvert` test), not anything this session had started. No work was lost
+    (nothing was running in it at the time), but added an "RSP session hygiene" section to
+    `AGENTS.md`: check a process's parent PID/start time before killing it by pattern match,
+    since this repo is worked on directly inside a shared live RSP session, not an isolated
+    sandbox.
+  - **Verification**: same approach as the prior entry (no HQ-scale run — nb_02's
+    `RUN_HEAVY_CALC` was left `True`, as the user had set it, but not executed by this session
+    for exactly that reason). All four `map_partitions` functions re-verified against real HQ
+    partitions after the rewrite, including the write-to-temp-then-promote round-trip for
+    nb_04's multiband case. `nbconvert --execute` on nb_03 and nb_04 (redirected to scratch
+    files) both failed at the expected point — a `FileNotFoundError` on the upstream
+    collection nb_02's real run hasn't produced yet — not from an unrelated bug.
+
 ## 2026-09-01 (3)
 
 - Refactored nb_02-05 (on the new `nb-v02` branch, off `nb-v01`'s tip) to work on nb_01's HQ

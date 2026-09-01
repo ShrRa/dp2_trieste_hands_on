@@ -35,11 +35,15 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
 ## Notebooks
 
 nb_01-04 each have a `RUN_HEAVY_CALC` flag (default `False`) around their one expensive step
-(a whole-collection query, or a `map_rows` pass over the subset). Leave it `False` to read the
-notebook and its already-registered output without waiting on a recompute; set it `True` only
-if you're deliberately regenerating that step's output — the *first* person to do so on a
-fresh `dp2_subset` root needs to run nb_01 through nb_04 in order with the flag on once, since
-each writes the collection the next one reads.
+(a whole-collection query, or a `map_partitions` pass over the HQ sample, writing straight
+from the lazy result with `resume=True` — a crash partway only costs the not-yet-written
+partitions). Leave it `False` to read the notebook and its already-registered output without
+waiting on a recompute; set it `True` only if you're deliberately regenerating that step's
+output — the *first* person to do so on a fresh `dp2_subset` root needs to run nb_01 through
+nb_04 in order with the flag on once, since each writes the collection the next one reads.
+`resume=True` only knows which pixels already exist on disk, not whether the mapped function
+changed, so delete the target collection first (or pass `overwrite=True`) after editing one of
+these functions, rather than relying on resume for a clean rebuild.
 
 nb_02-05 each start by picking a small slice of the HQ sample (one partition or a cone search,
 `select_slice` from `src/dataio/hq_sample.py`) to look at directly — the whole HQ sample is
@@ -56,13 +60,13 @@ nb_02-05 each start by picking a small slice of the HQ sample (one partition or 
   nb_02-05 all build on.
 - `notebooks/02_lc_histograms.ipynb` — `nDiaSources` histogram (whole HQ sample, one panel),
   plus per-object light-curve statistics (duration, cadence gap, per-band robust amplitude)
-  computed from the nested `diaSource` column via `lsdb.Catalog.map_rows` across the whole HQ
-  sample. Writes the stats back as new columns on a derived HATS collection
+  computed from the nested `diaSource` column via `lsdb.Catalog.map_partitions` across the
+  whole HQ sample. Writes the stats back as new columns on a derived HATS collection
   (`dia_object_lc_hq_with_stats`), not a separate side table.
 - `notebooks/03_color_mag_diagram.ipynb` — color-magnitude and color-color diagrams (`g-r` vs
   `r`, and `g-r` vs `r-i`; bands are plain variables), plotted as `hexbin` density maps (HQ
   scale saturates per-point scatter). Per-band magnitudes come from `ForcedSourceOnDiaObject`
-  (the nested `diaObjectForcedSource` column), aggregated per band via `map_rows` with a
+  (the nested `diaObjectForcedSource` column), aggregated per band via `map_partitions` with a
   quality cut (>=3 unflagged points per band), since `diaObject`'s own columns are either
   difference-image-based or too sparsely populated to use directly, and a crossmatch to the
   `Object` (coadd) table was ruled out (slow, ambiguous in crowded fields). Also splits objects
@@ -71,12 +75,15 @@ nb_02-05 each start by picking a small slice of the HQ sample (one partition or 
   this LSDB HATS collection. Output registered as `dia_object_lc_hq_with_mags`.
 
 - `notebooks/04_periods.ipynb` — per-band Lomb-Scargle periods (`astropy.timeseries.LombScargle`)
-  via `map_rows`, longest findable period bounded by nb_02's light-curve duration. Measures and
-  reports execution time (per the spec's ask), and folds the highest-power light curve as a
-  sanity check. Also runs `LombScargleMultiband` (pooling all bands per object) as a second
-  pass: much higher coverage at ~59x the per-object cost (both share one `RUN_HEAVY_CALC` flag
-  — budget for the multiband pass specifically at HQ scale, projected ~3.9 hours). Output
-  registered as `dia_object_lc_hq_with_periods`.
+  via `map_partitions`, longest findable period bounded by nb_02's light-curve duration.
+  Measures and reports execution time (per the spec's ask), and folds the highest-power light
+  curve as a sanity check. Also runs `LombScargleMultiband` (pooling all bands per object) as a
+  second pass: much higher coverage at ~59x the per-object cost (both share one
+  `RUN_HEAVY_CALC` flag — budget for the multiband pass specifically at HQ scale, projected
+  ~3.9 hours). The multiband pass writes to a temporary collection first (`resume=True` can't
+  safely add columns to the already-written single-band one in place) and promotes it once
+  done, so the expensive part stays resumable too. Output registered as
+  `dia_object_lc_hq_with_periods`.
 
 - `notebooks/05_interactive_explorer.ipynb` — demos `interactive_scatter_lc`
   (`src/visualization/lc_explorer.py`): click a point in a scatter plot (a CMD, a
