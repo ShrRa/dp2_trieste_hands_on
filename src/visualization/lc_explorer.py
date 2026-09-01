@@ -1,9 +1,11 @@
 """Interactive scatter-plot-plus-light-curve explorer (SPEC_V01.md, rough plan step 6).
 
 Click a point in a scatter plot (color-magnitude, period-amplitude, or anything else keyed by
-an object id), see that object's light curve on the right. Built on `plotly.graph_objects`
-`FigureWidget` + `ipywidgets`, which need a live Jupyter kernel with widget support (JupyterLab
-on RSP is the target; this hasn't been checked in VSCode or other IDEs).
+an object id), see that object's light curve on the right. Built on `holoviews` + `bokeh` +
+`panel`, matching the stack used by RSP's own interactive-plot tutorials
+(`notebooks/tutorials/DP2/300_Science_demos/312_Interactive_plots`) — all three ship in the
+RSP `lsst-scipipe` kernel already, unlike the `plotly`/`ipywidgets`/`anywidget` combination this
+replaced, which needed a manual `pip install` + browser reload the first time it was used there.
 """
 
 from __future__ import annotations
@@ -12,12 +14,14 @@ from typing import Sequence
 
 import numpy as np
 import pandas as pd
-import ipywidgets as widgets
-import plotly.graph_objects as go
-import plotly.colors as pcolors
+import panel as pn
+import holoviews as hv
+from holoviews import opts, streams
+
+hv.extension("bokeh")
+pn.extension()
 
 DEFAULT_BANDS = "ugriz"  # per spec: default bands to plot, y excluded
-DISCRETE_PALETTE = pcolors.qualitative.Plotly
 
 BAND_COLORS = {
     "u": "#7570b3",
@@ -74,6 +78,17 @@ def _fetch_lightcurve(
     return sub
 
 
+def _empty_lc_overlay(bands: Sequence[str], title: str, xlabel: str, ylabel: str, invert_yaxis: bool):
+    curves = {b: hv.Scatter([], "x", "y").opts(color=BAND_COLORS.get(b), size=6) for b in bands}
+    overlay = hv.NdOverlay(curves, kdims="band")
+    return overlay.opts(
+        opts.NdOverlay(
+            width=560, height=460, title=title, xlabel=xlabel, ylabel=ylabel,
+            legend_position="right", invert_yaxis=invert_yaxis,
+        )
+    )
+
+
 def interactive_scatter_lc(
     scatter_df: pd.DataFrame,
     x_col: str,
@@ -91,7 +106,7 @@ def interactive_scatter_lc(
     scatter_title: str | None = None,
     x_log: bool = False,
     y_log: bool = False,
-) -> widgets.HBox:
+):
     """Scatter plot (left) linked to a per-object light curve (right), click to update.
 
     Parameters mirror SPEC_V01.md's rough plan step 6: `scatter_df`/`x_col`/`y_col` are the
@@ -101,117 +116,98 @@ def interactive_scatter_lc(
     `period_col`, if given, names a column in `scatter_df` holding each object's period, enabling
     the fold toggle. `x_log`/`y_log` set a log scale on the scatter panel's axes (a period axis
     usually wants this) — purely cosmetic, doesn't affect the point indices the click handler
-    uses. Returns an `ipywidgets.HBox` — display it (or let it be the cell's last expression) in
-    a Jupyter session with widget support.
+    uses. Returns a `panel.Row` — display it (or let it be the cell's last expression) in a
+    Jupyter session; no widget-support install needed beyond what RSP's kernel already ships.
     """
     scatter_df = scatter_df.reset_index(drop=True)
 
-    hover_text = scatter_df[id_col].astype(str)
-    marker = dict(size=6, opacity=0.7)
-    if color_col is not None:
-        values = scatter_df[color_col]
-        if pd.api.types.is_numeric_dtype(values):
-            marker.update(color=values, colorscale="Plasma", showscale=True, colorbar=dict(title=color_col))
-        else:
-            # A continuous colorscale can't take strings — map categories to a discrete palette
-            # instead (no legend on a single go.Scatter trace, so the category rides along in
-            # the hover text instead).
-            categories = sorted(values.astype(str).unique())
-            cat_to_color = {c: DISCRETE_PALETTE[i % len(DISCRETE_PALETTE)] for i, c in enumerate(categories)}
-            marker.update(color=[cat_to_color[v] for v in values.astype(str)])
-        hover_text = hover_text + " | " + color_col + "=" + values.astype(str)
+    vdims = [id_col]
+    if color_col is not None and color_col != id_col:
+        vdims.append(color_col)
+    points = hv.Points(scatter_df, kdims=[x_col, y_col], vdims=vdims)
 
-    scatter_fig = go.FigureWidget(
-        data=[go.Scatter(x=scatter_df[x_col], y=scatter_df[y_col], mode="markers", marker=marker, text=hover_text, hoverinfo="text")]
+    point_opts = dict(
+        size=6, alpha=0.7, tools=["tap", "hover"], nonselection_alpha=0.3,
+        width=460, height=460, title=scatter_title or f"{y_col} vs {x_col}",
+        logx=x_log, logy=y_log, xlabel=x_col, ylabel=y_col,
     )
-    scatter_fig.update_layout(title=scatter_title or f"{y_col} vs {x_col}", xaxis_title=x_col, yaxis_title=y_col, width=460, height=460)
-    if "mag" in y_col.lower():
-        scatter_fig.update_yaxes(autorange="reversed")
-    if x_log:
-        scatter_fig.update_xaxes(type="log")
-    if y_log:
-        scatter_fig.update_yaxes(type="log")
-
-    lc_fig = go.FigureWidget()
-    for b in bands:
-        lc_fig.add_trace(
-            go.Scatter(
-                x=[],
-                y=[],
-                mode="markers",
-                name=b,
-                showlegend=True,
-                marker=dict(color=BAND_COLORS.get(b)),
-                error_y=dict(type="data", array=[], visible=False),
-            )
+    if color_col is not None:
+        is_numeric = pd.api.types.is_numeric_dtype(scatter_df[color_col])
+        point_opts.update(
+            color=color_col,
+            cmap="plasma" if is_numeric else "Category20",
+            colorbar=is_numeric,
+            legend_position="right" if not is_numeric else "top_right",
+            show_legend=not is_numeric,
         )
-    # showlegend=True at the layout level too: plotly defaults to hiding the legend when only
-    # one trace actually has data (the other bands' traces are empty, not just invisible), which
-    # would otherwise leave a single-band light curve with no indication of which band it is.
-    lc_fig.update_layout(width=560, height=460, xaxis_title="MJD", yaxis_title=mag_col, showlegend=True)
-    if "mag" in mag_col.lower():
-        lc_fig.update_yaxes(autorange="reversed")
-    # Plain full MJD values on the x-axis — plotly's default numeric tick formatting abbreviates
-    # a range like 60880 into "60.88k" otherwise.
-    lc_fig.update_xaxes(tickformat=".2f", exponentformat="none")
+    if "mag" in y_col.lower():
+        point_opts["invert_yaxis"] = True
+
+    points = points.opts(**point_opts)
+    selection = streams.Selection1D(source=points)
 
     has_period = period_col is not None
-    fold_toggle = widgets.ToggleButtons(options=[("Folded", True), ("Unfolded", False)], value=has_period, disabled=not has_period)
-    err_toggle = widgets.Checkbox(value=True, description="show flux errors")
-    info = widgets.HTML("<i>click a point in the left panel</i>")
+    fold_toggle = pn.widgets.RadioButtonGroup(
+        name="fold", options={"Folded": True, "Unfolded": False},
+        value=has_period, disabled=not has_period,
+    )
+    err_toggle = pn.widgets.Checkbox(name="show flux errors", value=True)
+    info = pn.pane.HTML("<i>click a point in the left panel</i>")
 
-    state: dict = {"obj_id": None}
+    lc_ylabel = mag_col
+    lc_invert = "mag" in mag_col.lower()
 
-    def render():
-        obj_id = state["obj_id"]
-        if obj_id is None:
-            return
+    def render_lc(index, fold, show_err):
+        if not index:
+            info.object = "<i>click a point in the left panel</i>"
+            return _empty_lc_overlay(bands, "no object selected", "MJD", lc_ylabel, lc_invert)
+
+        obj_id = scatter_df.iloc[index[0]][id_col]
         try:
-            _render(obj_id)
-        except Exception as exc:  # noqa: BLE001 - deliberately broad: see comment below.
-            # ipywidgets swallows exceptions raised inside on_click/observe callbacks instead of
-            # showing them anywhere in the notebook (they go to the kernel's terminal log at
-            # best) - a misconfigured column name would otherwise look exactly like "clicking
-            # does nothing", with no way for a user to tell why. Surface it in the info panel.
-            info.value = f"<b style='color:#b00'>Error rendering diaObjectId={obj_id}: {type(exc).__name__}: {exc}</b>"
+            lc = _fetch_lightcurve(lc_df, obj_id, id_col, nested_col, time_col, mag_col, magerr_col, band_col)
+        except Exception as exc:
+            # panel doesn't surface exceptions raised inside a bound callback anywhere in the
+            # notebook by default — same footgun the plotly version hit with ipywidgets. Surface
+            # it in the info panel before re-raising so it isn't silently swallowed.
+            info.object = f"<b style='color:#b00'>Error rendering diaObjectId={obj_id}: {type(exc).__name__}: {exc}</b>"
             raise
-
-    def _render(obj_id):
-        lc = _fetch_lightcurve(lc_df, obj_id, id_col, nested_col, time_col, mag_col, magerr_col, band_col)
 
         period = None
         if has_period:
             match = scatter_df.loc[scatter_df[id_col] == obj_id, period_col]
             if len(match) and pd.notna(match.iloc[0]):
                 period = float(match.iloc[0])
-        fold = fold_toggle.value and period is not None and period > 0
+        do_fold = fold and period is not None and period > 0
 
-        with lc_fig.batch_update():
-            for trace, b in zip(lc_fig.data, bands):
-                sel = lc[band_col] == b
-                t = lc.loc[sel, time_col].to_numpy()
-                mag = lc.loc[sel, mag_col].to_numpy()
-                magerr = lc.loc[sel, magerr_col].to_numpy()
-                trace.x = (t / period) % 1.0 if fold else t
-                trace.y = mag
-                trace.error_y = dict(type="data", array=magerr, visible=bool(err_toggle.value))
-            lc_fig.update_layout(
-                title=f"diaObjectId={obj_id}" + (f", period={period:.3f} d" if fold else ""),
-                xaxis_title="phase" if fold else "MJD",
+        curves = {}
+        for b in bands:
+            sel = lc[band_col] == b
+            t = lc.loc[sel, time_col].to_numpy()
+            mag = lc.loc[sel, mag_col].to_numpy()
+            magerr = lc.loc[sel, magerr_col].to_numpy()
+            x = (t / period) % 1.0 if do_fold else t
+            band_df = pd.DataFrame({"x": x, "y": mag, "err": magerr})
+            scatter_el = hv.Scatter(band_df, "x", "y").opts(color=BAND_COLORS.get(b), size=6)
+            if show_err and len(band_df):
+                curves[b] = hv.ErrorBars(band_df, "x", ["y", "err"]).opts(color=BAND_COLORS.get(b)) * scatter_el
+            else:
+                curves[b] = scatter_el
+
+        title = f"diaObjectId={obj_id}" + (f", period={period:.3f} d" if do_fold else "")
+        xlabel = "phase" if do_fold else "MJD"
+        overlay = hv.NdOverlay(curves, kdims="band").opts(
+            opts.NdOverlay(
+                width=560, height=460, title=title, xlabel=xlabel, ylabel=lc_ylabel,
+                legend_position="right", invert_yaxis=lc_invert,
             )
+        )
+
         period_text = f" | period={period:.3f} d" if period is not None else " | no period available"
-        info.value = f"<b>diaObjectId={obj_id}</b>{period_text if has_period else ''}"
+        info.object = f"<b>diaObjectId={obj_id}</b>{period_text if has_period else ''}"
+        return overlay
 
-    def on_click(_trace, points, _state):
-        if not points.point_inds:
-            return
-        state["obj_id"] = scatter_df.iloc[points.point_inds[0]][id_col]
-        render()
-
-    scatter_fig.data[0].on_click(on_click)
-    fold_toggle.observe(lambda _change: render(), names="value")
-    err_toggle.observe(lambda _change: render(), names="value")
+    lc_dmap = hv.DynamicMap(pn.bind(render_lc, index=selection.param.index, fold=fold_toggle, show_err=err_toggle))
 
     controls = [err_toggle] if not has_period else [fold_toggle, err_toggle]
-    right_panel = widgets.VBox([info, widgets.HBox(controls), lc_fig])
-    return widgets.HBox([scatter_fig, right_panel])
+    right_panel = pn.Column(info, pn.Row(*controls), lc_dmap)
+    return pn.Row(points, right_panel)

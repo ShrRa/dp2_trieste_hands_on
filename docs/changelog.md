@@ -1,5 +1,94 @@
 # Changelog
 
+## 2026-09-01 (3)
+
+- Refactored nb_02-05 (on the new `nb-v02` branch, off `nb-v01`'s tip) to work on nb_01's HQ
+  sample (`dia_object_lc_hq`, ~399k objects) instead of the old 5-field, 7,036-object subset,
+  and rewrote nb_05's interactive explorer onto `holoviews`/`bokeh`/`panel`, closing both
+  remaining `docs/backlog.md` items.
+  - Added `src/dataio/hq_sample.py` (`select_slice`): picks either one partition or a cone
+    search out of a lazy `lsdb.Catalog`. Every notebook from nb_02 on opens with a "pick a
+    slice of the HQ sample" section using it, per the backlog's ask — nb_02-04 use it for a
+    look-and-discard sample (their own plots work on the whole HQ sample); nb_05 uses it as
+    its actual working dataset, since `interactive_scatter_lc`'s `lc_df` must be materialized
+    and the whole ~399k-object sample is too big for that.
+    - Named the package `dataio`, not the originally-planned `io` (see `pyproject.toml`'s old
+      comment) — `io` would shadow Python's stdlib `io` module once nb_05 does
+      `sys.path.insert(0, ...)` (prepending, not appending), silently breaking anything in the
+      kernel that does `import io` afterward (pandas, pyarrow, IPython all rely on it). Caught
+      before it shipped, not from a real failure.
+  - nb_02: reads `hq_cat` directly instead of the old subset; the `nDiaSources` histogram is
+    now one combined panel (no more per-field split — HQ has no `field` column). Folded what
+    nb-v01 left as an open "Next" item — collapsing the separate compute-then-write steps into
+    one `map_rows(..., append_columns=True)` call — into this pass, since running it unfolded
+    at HQ scale would materialize the whole collection into memory twice. Output renamed
+    `dia_object_lc_hq_with_stats`.
+  - nb_03: same HQ-scale rename (`dia_object_lc_hq_with_mags`). Replaced all per-field
+    scatter/legend plots with `hexbin` density maps — alpha-blended scatter that worked at
+    ~7,000 points saturates into a solid blob well before HQ's ~399k, and there's no `field`
+    column to split panels by anymore anyway. The CMD panel that used to color by amplitude
+    per field now shows median r-band amplitude per hexbin instead (still answers "does
+    variability track a part of the CMD", now as one whole-sample view instead of N per-field
+    ones). Dropped the now-redundant "same, split per field" duplicate plot in section 4.
+  - nb_04: same HQ-scale rename (`dia_object_lc_hq_with_periods`); single-band and multiband
+    Lomb-Scargle stay behind one shared `RUN_HEAVY_CALC` flag (per explicit confirmation, given
+    multiband's ~59x cost). Extrapolated nb-v01's measured per-object rates to HQ scale in the
+    heavy-flag markdown: ~3.7 min single-band, ~3.9 hours multiband — not actually measured
+    against the full sample yet (see below). Found and fixed a real staleness bug in the
+    process: the multiband-vs-single-band comparison cell read the in-memory frame left over
+    from the multiband `map_rows` cell, which only existed right after that cell had run — it
+    now reopens the registered collection from disk instead.
+  - nb_05: rewrote `src/visualization/lc_explorer.py`'s `interactive_scatter_lc` from
+    `plotly.graph_objects.FigureWidget` + `ipywidgets` onto `holoviews` + `bokeh` + `panel` —
+    the stack RSP's own interactive-plot tutorials use
+    (`notebooks/tutorials/DP2/300_Science_demos/312_Interactive_plots`), and one already
+    shipped in the RSP kernel with no extra install (unlike `anywidget`, needed for plotly's
+    `FigureWidget`, which wasn't and needed `pip install --user anywidget` + a browser reload
+    the first time nb-v01 hit it). Click handling now uses `hv.streams.Selection1D` on an
+    `hv.Points` scatter, combined with `panel` toggle widgets via `pn.bind` +
+    `hv.DynamicMap`; the function's public signature (`scatter_df`/`x_col`/`y_col`/`lc_df`/
+    `color_col`/`period_col`/etc.) is unchanged, so nb_05's two demo calls only needed their
+    data source and `color_col` updated (HQ has no `field` column; switched to
+    `max_reliability`/`duration_days`).
+    - **Resolved a real limitation of the old version in the process**: a categorical
+      `color_col` couldn't get a per-category legend on a single plotly trace before (the
+      category rode along in hover text instead); `holoviews`'s native categorical coloring
+      draws a real legend, no workaround needed.
+    - Kept `plotly`/`ipywidgets` in `pyproject.toml` (both predate nb_05 and
+      `lc_explorer.py` in the pinned environment — confirmed via `git log` — so may be used
+      elsewhere in the mirrored conda env); removed only `anywidget`, which the 2026-08-29
+      entry confirms was added specifically for plotly's `FigureWidget` and has no other
+      purpose in this repo. Added `holoviews==1.23.2` (the version this session's live RSP
+      kernel actually has).
+  - **Verification approach, given none of the HQ-scale heavy calcs were actually run in this
+    session (explicit choice — code + small-scale verification only, not multi-minute-to-hour
+    RSP compute)**:
+    - `select_slice` (both modes) confirmed against the real `dia_object_lc_hq` collection.
+    - Each notebook's `map_rows` function (nb_02's `lc_stats`, nb_03's `band_mags`, nb_04's
+      `band_periods`/`multiband_period`) run end-to-end — including a real `write_catalog` +
+      reopen round-trip for nb_02's — against a real single partition of the HQ sample (42
+      objects), not a synthetic one.
+    - nb_03's `hexbin` plotting and nb_05's `interactive_scatter_lc` (numeric `color_col`,
+      categorical `color_col`, no `color_col`, no `period_col`, and the empty-selection state)
+      all built and were forced through actual Bokeh plot compilation
+      (`hv.renderer("bokeh").get_plot(...)`) against real HQ-derived data — not just "the
+      Python object constructs without error".
+    - nb_05's per-object light-curve rendering logic specifically was exercised for every
+      object in a 42-object test partition, across all four fold/error-bar toggle
+      combinations, with zero errors — the same "click everything programmatically" approach
+      used to verify the plotly version on 2026-08-29.
+    - `jupyter nbconvert --execute` on nb_02 (redirected to a scratch file, not the committed
+      notebook) confirmed section 0/1 run cleanly against the real full HQ sample (the ~70 s
+      whole-sample flat-column read included) and that execution fails exactly where expected
+      — a `FileNotFoundError` on the not-yet-created `dia_object_lc_hq_with_stats` — not from
+      an unrelated bug earlier in the notebook.
+    - **Not done**: an actual full end-to-end `nbconvert --execute` of nb_02 through nb_05 with
+      `RUN_HEAVY_CALC=True`. Whoever populates this branch's registry for real first should
+      run nb_01 (already done) through nb_04 in order with the flag on once — expect nb_04's
+      multiband pass specifically to take hours, not minutes — then re-verify nb_05 live in
+      JupyterLab (its click-to-update behavior still can't be checked non-interactively either
+      way, plotly or holoviews).
+
 ## 2026-09-01 (2)
 
 - Added a `RUN_HEAVY_CALC` flag (default `False`) to nb_01, nb_02, nb_03, and nb_04, on the
