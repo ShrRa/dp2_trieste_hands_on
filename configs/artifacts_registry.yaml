@@ -70,4 +70,18 @@ artifacts:
     type: dp2_subset
     updated_at: '2026-08-27T18:50:13+00:00'
     updated_by: shrra-ung
+  dia_object_lc_hq:
+    format: hats-collection
+    hash: sha256:792e247b49149c1a62c63b262283cab6e0ef7482a87326628cca520c16310ec0
+    inputs: []
+    notes: Full list of diaObjects with nDiaSources>100.
+    path: collection.properties
+    root: dp2_hq
+    tags:
+    - diaobject
+    - dp2
+    - nb01
+    type: dp2_hq
+    updated_at: '2026-09-01T07:57:23+00:00'
+    updated_by: shrra-ung
 registry_version: 1
