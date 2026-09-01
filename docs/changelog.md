@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-09-01 (5)
+
+- Vectorized nb_02's `lc_stats_partition` and nb_03's `band_mags_partition` — replacing the
+  `for i in range(len(df)): row = df.iloc[i]` loop each used inside its `map_partitions` call
+  with `.explode(...)` (same method nb_01 uses) to a long, one-row-per-epoch table, followed by
+  ordinary pandas `groupby` aggregations across every object in the partition at once. Per the
+  user's own observation that the loop — a natural thing to reach for with a `map_rows`/
+  `map_partitions`-style per-row API — wasn't actually necessary, since a nested column is just
+  every object's epochs concatenated together.
+  - **Measured on a real 75-partition, 2,713-object slice, not estimated**: nb_02's version is
+    ~300x faster (0.35s vs 105s), nb_03's ~50x (2.1s vs 107s). At HQ scale (~399k objects,
+    ~57x this slice) that projects nb_02's pass from ~4.4 hours down to ~50s, and nb_03's from
+    ~4.4 hours down to ~5 minutes — the loop version would have made both about as expensive as
+    nb_04's multiband pass, for computations that are actually cheap once vectorized.
+  - Verified numerically identical to the original loop version on that same slice (exact
+    match for nb_02's stats; nb_03's per-band medians differ by ~1e-6, a float32-storage
+    rounding artifact between `np.median` and pandas' groupby `.median()`, not a logic
+    difference) — every column, not spot-checked.
+  - Found and fixed a real bug while vectorizing nb_02's amplitude calculation: an initial
+    version used `groupby([id, band]).quantile([0.1, 0.9]).unstack(-1)` to get both
+    percentiles in one pass, which crashes with `KeyError: 0.9` on an empty input — and
+    `map_partitions` calls the function once on an empty `DataFrame` to infer its output
+    schema when `meta` isn't given explicitly, so this would have broken *every* real
+    `RUN_HEAVY_CALC=True` run, not just an edge case. Fixed by looping over the 6 bands (still
+    fully vectorized across objects within each band) instead of trying to get both
+    percentiles from one grouped call — simpler and empty-safe.
+  - Re-verified the full `map_partitions` → `write_catalog(..., resume=True)` → reopen
+    round-trip end to end with both new functions against real HQ partitions (not just the
+    bare function output), same as the prior entry's approach for the loop versions.
+  - nb_04's Lomb-Scargle functions are unchanged — `astropy.timeseries.LombScargle`/
+    `LombScargleMultiband` operate on one object's own ragged, differently-sized time array at
+    a time with no batched multi-object API, so there's no equivalent vectorization available
+    there; the per-object loop is the actual computation, not a shortcut around it.
+
 ## 2026-09-01 (4)
 
 - Reworked nb_02/nb_03/nb_04's heavy-calculation cells from `map_rows(..., append_columns=True)`
