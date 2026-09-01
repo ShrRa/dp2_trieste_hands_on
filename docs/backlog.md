@@ -1,8 +1,5 @@
 # Backlog
 
-- **Add 'long calculations' flag so that the participants of the workshop could see how the samples were prepared, but didn't relaunch computationally-heavy parts**:
-In each notebook where we obtain/calculate large samples (e.g. the retrieval of objects with nDiaSources>100), we should wrap these heavy calculations in a bool flag that is FALSE by default. Only reading/inspection/analysis sections should be re-runned by the participants.
-
 - **Refactor notebooks 02-05 to use HQ sample, not the per-fields sample**:
   - Do this work in a new branch, nb-v02.
 

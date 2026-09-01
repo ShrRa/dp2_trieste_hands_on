@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-09-01 (2)
+
+- Added a `RUN_HEAVY_CALC` flag (default `False`) to nb_01, nb_02, nb_03, and nb_04, on the
+  new `nb-v02` branch — one flag per notebook, gating only the expensive step each one has
+  (nb_01's whole-collection HQ-sample query, nb_02's/nb_03's/nb_04's `map_rows` passes and the
+  `write_catalog`/`dp.register` calls that follow them) so workshop participants can read and
+  run each notebook end to end without relaunching a multi-minute-plus computation, while still
+  being able to flip the flag to `True` and regenerate everything from scratch.
+  - When `False`, each gated cell now loads its inputs from the already-registered artifact on
+    disk instead (e.g. nb_02 reads `dia_object_lc_10plus_with_stats` rather than recomputing LC
+    stats via `map_rows`) — reading/inspection/plotting sections downstream are otherwise
+    unchanged and don't need the flag.
+  - nb_04's single-band (sections 1-2) and multiband (section 5) Lomb-Scargle passes share one
+    flag, per the ~59x cost difference already logged for multiband — flipping `RUN_HEAVY_CALC`
+    reruns both together rather than one at a time.
+  - Found and fixed a latent staleness bug while doing this: nb_04's multiband-vs-single-band
+    comparison cell (after section 5) read the in-memory `merged_df` left over from the
+    multiband `map_rows` cell, which only existed when that cell had just run — it now reopens
+    `dia_object_lc_10plus_with_periods` from disk instead, so it works correctly whether or not
+    `RUN_HEAVY_CALC` triggered a fresh write in the same run.
+  - Verified all four notebooks end-to-end via `jupyter nbconvert --execute --inplace` with the
+    new `RUN_HEAVY_CALC=False` default on the real RSP data/artifacts — no errors, and nb_02's
+    reloaded stats and nb_04's reloaded periods matched the shapes/values from the original
+    `RUN_HEAVY_CALC=True` runs logged earlier in this changelog.
+
 ## 2026-09-01
 
 - Moved the high-quality sample (`nDiaSources > 100`, nb_01 section 5) from the private

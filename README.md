@@ -41,6 +41,11 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
 
 ## Notebooks
 
+nb_01-04 each have a `RUN_HEAVY_CALC` flag (default `False`) around their one expensive step
+(a whole-collection query, or a `map_rows` pass over the subset). Leave it `False` to read the
+notebook and its already-registered output without waiting on a recompute; set it `True` only
+if you're deliberately regenerating that step's output.
+
 - `notebooks/01_read_diaObj.ipynb` — visualizes the DP2 `diaObject` footprint (coverage map
   via `plot_pixels()`, plus a depth/cadence map built from r-band visit counts), lets you pick
   fields by eye as plain `(ra, dec)` coordinates, pulls each out with `cone_search`, filters to
