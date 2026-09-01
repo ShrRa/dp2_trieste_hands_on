@@ -1,8 +1,5 @@
 # Backlog
 
-- **Move the new HQ sample to the shared directory and update the artifacts registry**:
-I manually edited nb-01 to create a high-quality sample with diaObjects with more than 100 diaSources. I saved this collection to `deleted_sundays`, but the attendees of the workshop won't have access to it. We need to move this collection to the `dp2_subset` folder, and edit the registry accordingly.
-
 - **Add 'long calculations' flag so that the participants of the workshop could see how the samples were prepared, but didn't relaunch computationally-heavy parts**:
 In each notebook where we obtain/calculate large samples (e.g. the retrieval of objects with nDiaSources>100), we should wrap these heavy calculations in a bool flag that is FALSE by default. Only reading/inspection/analysis sections should be re-runned by the participants.
 

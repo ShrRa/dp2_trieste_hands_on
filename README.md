@@ -46,7 +46,9 @@ kernel currently ships, so on RSP install `datapaths` directly as above instead.
   fields by eye as plain `(ra, dec)` coordinates, pulls each out with `cone_search`, filters to
   `nDiaSources > 10`, and writes/registers a small subset for the rest of the workshop to use.
   Also demonstrates converting a catalog to pandas/numpy and building a long-format
-  light-curve table via `explode`.
+  light-curve table via `explode`. Section 5 additionally selects the full high-quality sample
+  (`nDiaSources > 100` across the whole `diaObject` collection, no per-field cone search),
+  written and registered as `dia_object_lc_hq` for nb-v02's notebooks to build on.
 - `notebooks/02_lc_histograms.ipynb` — `nDiaSources` histograms, plus per-object light-curve
   statistics (duration, cadence gap, per-band robust amplitude) computed from the nested
   `diaSource` column via `lsdb.Catalog.map_rows`. Writes the stats back as new columns on a

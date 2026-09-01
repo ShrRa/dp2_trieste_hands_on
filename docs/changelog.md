@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-09-01
+
+- Moved the high-quality sample (`nDiaSources > 100`, nb_01 section 5) from the private
+  `/deleted-sundays/shrra-ung/dp2_hq` path it was manually written to, into the shared
+  `dp2_subset` root (`~/share/trieste/dia_object_lc_hq`) so workshop attendees can actually
+  reach it — the previous location wasn't accessible to them.
+  - Copied all 4,454 files / ~17 GB across filesystems (`/deleted-sundays` → `/home`),
+    verified file count, total bytes, and the `collection.properties` hash all matched before
+    removing the old copy, and confirmed `lsdb.open_catalog` reads the new location correctly
+    (4,445 partitions, same columns as before).
+  - Fixed a real bug found in the process: nb_01 section 5 wrote to a hardcoded absolute path
+    (`'/deleted-sundays/shrra-ung/dp2_hq'`) instead of going through `dp["dp2_hq"]` or any
+    `datapaths` root at all — the write, the `dp.register` call, and the reopen afterward now
+    all route through `dp["dp2_subset"] / "dia_object_lc_hq"` (a `hq_path` variable), matching
+    every other artifact in this repo.
+  - Updated `configs/artifacts_registry.yaml`'s `dia_object_lc_hq` entry (`root`/`type`
+    `dp2_hq` → `dp2_subset`, `path` → `dia_object_lc_hq/collection.properties`) via
+    `dp.register(..., overwrite_history=True)`, and retired the now-unused `dp2_hq` root from
+    `configs/roots.local.yaml` (gitignored, machine-local only).
+
 ## 2026-08-29 (7)
 
 - Root cause of the "no light curve appears" report found: the user's actual call set `mag_col`/
