@@ -72,17 +72,24 @@ artifacts:
     updated_by: shrra-ung
   dia_object_lc_hq:
     format: hats-collection
-    hash: sha256:792e247b49149c1a62c63b262283cab6e0ef7482a87326628cca520c16310ec0
+    hash: sha256:6ecedecdc76ebef8dbe662424de91998d0ab07babe0dd0451fcefb88b96a8fa5
     inputs: []
-    notes: Full list of diaObjects with nDiaSources>100. Moved from a private deleted-sundays
-      path into the shared dp2_subset root so workshop participants can access it.
+    notes: nb_01's base HQ sample plus nb_02's LC stats, plus {band}_mag_median (per
+      band, median diaObjectForcedSource.psfMag, quality-flagged rows excluded, >=5
+      points required) and max_reliability (max diaSource.reliability) columns, from
+      nb_03.
     path: dia_object_lc_hq/collection.properties
     root: dp2_subset
     tags:
+    - cmd
     - diaobject
     - dp2
+    - forced-photometry
+    - hq
     - nb01
+    - nb02
+    - nb03
     type: dp2_subset
-    updated_at: '2026-09-01T10:26:30+00:00'
+    updated_at: '2026-09-02T09:29:24+00:00'
     updated_by: shrra-ung
 registry_version: 1
