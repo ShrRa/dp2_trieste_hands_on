@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-09-02
+
+- nb_04's single-band and multiband Lomb-Scargle passes now also save the top-5 local maxima
+  of each periodogram (`periodogram_peaks`/`multiband_periodogram_peaks`, new nested columns
+  with `band`/`rank`/`period_days`/`power` sub-columns — no `band` for the multiband one,
+  since that periodogram already pools all bands), per the user's point that only keeping the
+  single best period per periodogram throws away exactly what aliasing checks need (the
+  runner-up peaks, e.g. near known daily/yearly aliases).
+  - Checked the actual periodogram grid size on real data before deciding how to store this:
+    median ~660 `(freq, power)` points per band-object periodogram, up to ~1900. Saving the
+    *whole* grid for the HQ sample would run to roughly a billion pairs for the single-band
+    pass alone (tens of GB) — saving only local maxima (`scipy.signal.find_peaks`, not just
+    the top-N raw grid points, which cluster around the single tallest peak rather than being
+    distinct candidate periods) cuts that to an estimated ~7-8M peak rows.
+  - Found and fixed the same class of empty-DataFrame bug as the earlier `map_partitions`
+    entries, in a new place: `nested_pandas.NestedFrame.join_nested()` (the non-deprecated
+    replacement for `add_nested()`) crashes packing an empty peaks table into a nested column
+    when that table has no columns at all — which is exactly what `pd.DataFrame([])` (from an
+    empty list of dicts) produces, and exactly what `map_partitions`'s empty-frame
+    meta-inference call hits every time. Fixed by building the peaks table with explicit
+    per-column dtypes (`pd.array(..., dtype=...)`) instead of inferring them from a
+    possibly-empty list of dicts, so the column set exists even with zero rows.
+  - Verified end to end against real HQ partition data: the peaks nested column round-trips
+    correctly through `write_catalog`/reopen/`.explode()`, and — same rigor as the earlier
+    `map_partitions` rewrite — re-ran the exact code extracted verbatim from the notebook file
+    (not a hand-copied version) through the full nb_01→nb_02→nb_03→nb_04(single)→nb_04(multi)
+    write-to-temp-then-promote chain, confirming no transcription error and that both new
+    nested columns survive every subsequent promotion.
+  - Clarified in nb_04 (unprompted question from the user) that `FULL_COLLECTION_ROWS` is
+    purely cosmetic — it only feeds one projection print statement and has no effect on
+    `write_catalog`/`map_partitions`/row counts; objects without a period are never dropped
+    from the write regardless of that constant, since the periodogram functions fill `NaN`
+    for them rather than removing the row.
+
 ## 2026-09-01 (6)
 
 - Refactored nb_02-05 to read and write **one shared collection** (`dia_object_lc_hq`) instead

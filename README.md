@@ -91,7 +91,10 @@ nb_02-05 each start by picking a small slice of the HQ sample (one partition or 
   `RUN_HEAVY_CALC` flag — budget for the multiband pass specifically at HQ scale, projected
   ~3.9 hours). Unlike nb_02/nb_03's functions, astropy's `LombScargle`/`LombScargleMultiband`
   have no batched multi-object API, so both passes still loop per object — that loop is the
-  actual computation here, not a shortcut around one.
+  actual computation here, not a shortcut around one. Both passes also save the top-5 local
+  maxima of each periodogram (`periodogram_peaks`/`multiband_periodogram_peaks`, new nested
+  columns), not just the single best period — raw material for checking candidate periods
+  against known daily/yearly aliases, without the cost of saving the whole periodogram grid.
 
 - `notebooks/05_interactive_explorer.ipynb` — demos `interactive_scatter_lc`
   (`src/visualization/lc_explorer.py`): click a point in a scatter plot (a CMD, a
