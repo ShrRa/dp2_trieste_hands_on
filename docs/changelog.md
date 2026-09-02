@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-09-02 (2)
+
+- Fixed a real failure the user hit running nb_04 for real: `write_catalog(tmp_path,
+  resume=True, ...)` crashed with `RuntimeError: ... AppendRowGroups requires equal schemas.
+  This schema has 115 columns, other has 111`, leaving `dia_object_lc_hq_nb04_singleband_tmp`
+  (17 GB) half-written. Root cause: an earlier, interrupted attempt had already written some
+  pixels to that temporary path under an older, narrower-schema version of
+  `band_periods_partition` (before the previous entry added `periodogram_peaks`); resuming
+  after the function changed meant the still-missing pixels got computed with the new,
+  wider schema, and HATS's final metadata-assembly step can't combine row groups with
+  different schemas — exactly the `resume=True` caveat already documented in every heavy-flag
+  markdown, now actually encountered.
+  - Added `write_catalog_resumable` (`src/dataio/hats_write.py`): wraps `Catalog.write_catalog`,
+    catches specifically this `AppendRowGroups requires equal schemas` `RuntimeError`, deletes
+    the target path, and retries the write once from scratch — so a schema mismatch now costs
+    a full redo of that pass instead of a manual `rm -rf` and a cryptic pyarrow traceback.
+    Verified the retry logic against a mock that raises the exact error message once then
+    succeeds (control flow only — the real pyarrow failure mode wasn't cleanly reproducible in
+    a quick synthetic test, but the fix targets the literal error string from the user's real
+    traceback), and confirmed the happy path still works normally against a real `lsdb.Catalog`
+    write.
+  - Wired into all four heavy-write call sites (nb_02, nb_03, nb_04 single-band and multiband)
+    in place of calling `.write_catalog()` directly.
+  - Deleted the stale, half-written `dia_object_lc_hq_nb04_singleband_tmp` (17 GB) to unblock
+    the user — one small `.nfs*` fragment inside it couldn't be removed (`Device or resource
+    busy`, an NFS silly-rename file still held open by some process, likely the user's own
+    live kernel from the failed attempt); harmless, and left alone to clear on its own rather
+    than chasing down and killing whatever holds it (see the AGENTS.md note from the last time
+    this session got that wrong).
+
 ## 2026-09-02
 
 - nb_04's single-band and multiband Lomb-Scargle passes now also save the top-5 local maxima
