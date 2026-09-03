@@ -70,4 +70,28 @@ artifacts:
     type: dp2_subset
     updated_at: '2026-08-27T18:50:13+00:00'
     updated_by: shrra-ung
+  dia_object_lc_hq:
+    format: hats-collection
+    hash: sha256:fd42511c0d77cac383866313213f95db3e3b03db6026d3bca352b1b1882b2d4e
+    inputs: []
+    notes: 'nb_01''s base HQ sample plus nb_02''s stats and nb_03''s magnitudes, plus
+      {band}_period_days/{band}_period_power (per band, Lomb-Scargle on diaSource.scienceMag,
+      >=10 points required, max period = duration_days/2), best_period_days/best_period_power
+      (highest-power band), and periodogram_peaks (nested: band/rank/period_days/power,
+      top-5 local maxima per band, for alias-checking), from nb_04.'
+    path: dia_object_lc_hq/collection.properties
+    root: dp2_subset
+    tags:
+    - diaobject
+    - dp2
+    - hq
+    - lomb-scargle
+    - nb01
+    - nb02
+    - nb03
+    - nb04
+    - periods
+    type: dp2_subset
+    updated_at: '2026-09-02T23:15:59+00:00'
+    updated_by: shrra-ung
 registry_version: 1

@@ -23,3 +23,15 @@ After implementing a new feature or doing a major refactoring:
 - Run the tests, if present.
 - At the end of the round of changes, ask whether the branch should be merged to `main` (or to some other branch).
 - After each round of editing the code, commit the changes to git and run `git push`.
+
+### RSP session hygiene
+
+This repo is worked on directly inside a live RSP JupyterLab session, not an isolated
+sandbox — the user's own notebooks/kernels (and anything they spawn, e.g. a `dask.distributed`
+`Client`) run in that same shared process space alongside anything an agent starts (e.g. via
+`jupyter nbconvert --execute`). Before killing any process (`pkill`, `kill`, etc.) to clean up
+after a test run, check its parent PID / start time / cmdline first to confirm it actually
+belongs to that test run and not to the user's own live session — a broad pattern match like
+`pkill -f "dask worker"` can just as easily hit the user's own Dask cluster. If a test leaves
+orphaned processes, prefer killing them by exact PID (captured before the test started) over a
+pattern match after the fact.

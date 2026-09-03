@@ -21,7 +21,6 @@ dependencies = [
     "aioitertools==0.13.0",
     "aiosignal==1.4.0",
     "annotated-types==0.8.0",
-    "anywidget==0.11.0",
     "astropy==8.0.1",
     "astropy-iers-data==0.2026.8.24.0.24.29",
     "asttokens==3.0.2",
@@ -60,6 +59,7 @@ dependencies = [
     "h2==4.4.1",
     "h5py==3.16.0",
     "hats==0.10.4",
+    "holoviews==1.23.2",
     "hpack==4.2.0",
     "hpgeom==1.5.4",
     "html5lib==1.1",
@@ -172,9 +172,8 @@ dependencies = [
     "zipp==4.1.0",
 ]
 
-# src/visualization now has real code (the interactive scatter+LC explorer, nb_05); src/io is
-# still unused. On RSP, notebooks import this by adding `src/` to sys.path directly rather than
-# via `pip install .` — the pinned Python 3.14 here is newer than RSP's kernel (see README).
+# On RSP, notebooks import these by adding `src/` to sys.path directly rather than via
+# `pip install .` — the pinned Python 3.14 here is newer than RSP's kernel (see README).
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["visualization"]
+packages = ["visualization", "dataio"]
