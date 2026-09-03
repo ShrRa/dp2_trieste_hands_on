@@ -10,16 +10,27 @@ replaced, which needed a manual `pip install` + browser reload the first time it
 
 from __future__ import annotations
 
+import warnings
 from typing import Sequence
 
 import numpy as np
 import pandas as pd
 import panel as pn
 import holoviews as hv
+from bokeh.util.warnings import BokehUserWarning
 from holoviews import opts, streams
 
 hv.extension("bokeh")
 pn.extension()
+
+# diaObjectId (~1e17-1e18) is passed to the scatter plot as a hover-tooltip field, and BokehJS
+# represents numbers as JS floats, exact only up to 2**53 (~9e15) — this is genuinely lossy for
+# the copy of the id rendered client-side, but harmless: the click handler below always looks up
+# the exact int64 id server-side from the clicked point's *index*, never from the value BokehJS
+# renders. Silencing only this exact message so other, actionable BokehUserWarnings still show.
+warnings.filterwarnings(
+    "ignore", message="out of range integer may result in loss of precision", category=BokehUserWarning
+)
 
 DEFAULT_BANDS = "ugriz"  # per spec: default bands to plot, y excluded
 

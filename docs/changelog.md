@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-03 (4)
+
+- Suppressed the `BokehUserWarning: out of range integer may result in loss of precision`
+  spam nb_05's interactive plots print (one per plotted object) — the user's question about
+  whether it needed attention. Root cause: `diaObjectId` (~1e17-1e18) is passed to the scatter
+  plot as a hover-tooltip field, and Bokeh's `int64` arrays can't be binary-encoded at all
+  (`bokeh/util/serialization.py`'s `BINARY_ARRAY_TYPES` doesn't include `int64` — a documented
+  Bokeh limitation, not specific to this data), so every `int64` array always falls back to
+  encoding each element as a scalar Python `int`, warning per element once its value exceeds
+  JavaScript's exact-integer range (`2**53`) — genuinely lossy for the copy of the id rendered
+  client-side (e.g. in a hover tooltip), but harmless here: the click handler always looks up
+  the exact `int64` id server-side from the clicked point's *index*, never from the
+  BokehJS-rendered value (already noted when the user first asked about this).
+  - Fix: one `warnings.filterwarnings("ignore", message=..., category=BokehUserWarning)` in
+    `src/visualization/lc_explorer.py`, filtered on the exact message text so other, actionable
+    `BokehUserWarning`s (a different message) still show.
+  - Verified against the real Bokeh install: `hv.renderer("bokeh").get_plot(...)` alone doesn't
+    trigger the warning (it only fires at serialization, e.g. `bokeh.embed.json_item`, which is
+    what actually runs when a plot is displayed in Jupyter) — reproduced 2 warnings for a
+    2-point `int64` id column via `json_item` before the fix, 0 after; confirmed an unrelated
+    `BokehUserWarning` with different text still surfaces normally.
+
 ## 2026-09-03 (3)
 
 - Made `datapaths` optional for `notebooks/05_interactive_explorer.ipynb`, per the user's plan
