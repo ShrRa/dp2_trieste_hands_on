@@ -78,13 +78,88 @@ def _fetch_lightcurve(
     return sub
 
 
-def _empty_lc_overlay(bands: Sequence[str], title: str, xlabel: str, ylabel: str, invert_yaxis: bool):
-    curves = {b: hv.Scatter([], "x", "y").opts(color=BAND_COLORS.get(b), size=6) for b in bands}
+def _empty_lc_overlay(bands: Sequence[str], title: str, xlabel: str, ylabel: str, invert_yaxis: bool, show_err: bool):
+    # Same ErrorBars-always-present, visibility-toggled construction as plot_lightcurve, so this
+    # "no selection" frame is the same hv.Overlay type as a real-selection frame — this frame and
+    # a real one are successive frames of the *same* hv.DynamicMap, and holoviews requires
+    # homogeneous element types across a DynamicMap's frames just as it does across one
+    # NdOverlay's keys (see plot_lightcurve's comment for what breaks otherwise).
+    empty = pd.DataFrame({"x": [], "y": [], "err": []})
+    curves = {}
+    for b in bands:
+        scatter_el = hv.Scatter(empty, "x", "y").opts(color=BAND_COLORS.get(b), size=6)
+        errorbars_el = hv.ErrorBars(empty, "x", ["y", "err"]).opts(color=BAND_COLORS.get(b), visible=show_err)
+        curves[b] = errorbars_el * scatter_el
     overlay = hv.NdOverlay(curves, kdims="band")
     return overlay.opts(
         opts.NdOverlay(
             width=560, height=460, title=title, xlabel=xlabel, ylabel=ylabel,
             legend_position="right", invert_yaxis=invert_yaxis,
+        )
+    )
+
+
+def plot_lightcurve(
+    lc_df: pd.DataFrame,
+    obj_id,
+    id_col: str = "diaObjectId",
+    bands: Sequence[str] = DEFAULT_BANDS,
+    nested_col: str | None = "diaSource",
+    time_col: str = "midpointMjdTai",
+    mag_col: str = "scienceMag",
+    magerr_col: str = "scienceMagErr",
+    band_col: str = "band",
+    period: float | None = None,
+    fold: bool = False,
+    show_err: bool = True,
+    title: str | None = None,
+):
+    """Plot one object's light curve directly — no click, no stream, no `panel` widget.
+
+    Failsafe for `interactive_scatter_lc`: it does exactly what that widget's click handler does
+    internally (same lookup, same folding, same error-bar overlay), but as a plain function call
+    in its own cell, so it keeps working even if the widget's click-to-update `panel`/`bokeh`
+    comm needs a browser reload to come back to life mid-workshop. Read `obj_id` off
+    `interactive_scatter_lc`'s "selected id" panel (which stays independent of the light-curve
+    panel for exactly this reason) and call this instead, e.g.
+    `plot_lightcurve(lc_df, obj_id=1234567890, period=3.21, fold=True)`.
+
+    `fold` is taken as-is: pass `period=None` (or omit it) to plot unfolded. Other parameters
+    match `interactive_scatter_lc`'s.
+    """
+    lc = _fetch_lightcurve(lc_df, obj_id, id_col, nested_col, time_col, mag_col, magerr_col, band_col)
+    do_fold = fold and period is not None and period > 0
+
+    curves = {}
+    for b in bands:
+        sel = lc[band_col] == b
+        t = lc.loc[sel, time_col].to_numpy()
+        mag = lc.loc[sel, mag_col].to_numpy()
+        magerr = lc.loc[sel, magerr_col].to_numpy()
+        x = (t / period) % 1.0 if do_fold else t
+        band_df = pd.DataFrame({"x": x, "y": mag, "err": magerr})
+        scatter_el = hv.Scatter(band_df, "x", "y").opts(color=BAND_COLORS.get(b), size=6)
+        # Always overlay ErrorBars (toggling only its visibility, never whether it's present)
+        # so every band's element is the same hv.Overlay type in every state — a band with no
+        # data for this object, show_err on vs. off, and the "no selection" placeholder frame
+        # all have to match, since holoviews requires homogeneous element types both across an
+        # NdOverlay's keys (per-band, here) and across an hv.DynamicMap's successive frames
+        # (real selection vs. `_empty_lc_overlay`, one toggle state vs. another) — mixing
+        # hv.Scatter and hv.Overlay in either place breaks Bokeh's range computation with
+        # `AttributeError: 'Overlay' object has no attribute 'extents'` (or a similar
+        # cross-frame `AttributeError` depending on which two frames/keys collide).
+        errorbars_el = hv.ErrorBars(band_df, "x", ["y", "err"]).opts(color=BAND_COLORS.get(b), visible=show_err)
+        curves[b] = errorbars_el * scatter_el
+
+    lc_invert = "mag" in mag_col.lower()
+    xlabel = "phase" if do_fold else "MJD"
+    plot_title = title
+    if plot_title is None:
+        plot_title = f"{id_col}={obj_id}" + (f", period={period:.3f} d" if do_fold else "")
+    return hv.NdOverlay(curves, kdims="band").opts(
+        opts.NdOverlay(
+            width=560, height=460, title=plot_title, xlabel=xlabel, ylabel=mag_col,
+            legend_position="right", invert_yaxis=lc_invert,
         )
     )
 
@@ -118,6 +193,11 @@ def interactive_scatter_lc(
     usually wants this) — purely cosmetic, doesn't affect the point indices the click handler
     uses. Returns a `panel.Row` — display it (or let it be the cell's last expression) in a
     Jupyter session; no widget-support install needed beyond what RSP's kernel already ships.
+
+    The right panel always shows a "selected id" line above the light curve, updated straight
+    from the click stream independently of the light-curve plot itself — if the light curve
+    ever stops refreshing on click, that line still names the clicked object's `id_col` value,
+    to hand to `plot_lightcurve` (this module's non-interactive fallback) in a separate cell.
     """
     scatter_df = scatter_df.reset_index(drop=True)
 
@@ -157,50 +237,43 @@ def interactive_scatter_lc(
     lc_ylabel = mag_col
     lc_invert = "mag" in mag_col.lower()
 
+    def _selected_id_text(index):
+        # Deliberately independent of render_lc/lc_dmap below: this is the failsafe display —
+        # it should keep showing which point is selected even if the light-curve panel itself
+        # stops updating (e.g. a stale bokeh/panel comm needing a browser reload mid-workshop).
+        # If this panel is showing a diaObjectId but the light-curve panel doesn't follow, call
+        # `plot_lightcurve(lc_df, obj_id=<this id>, ...)` directly in a separate cell instead.
+        if not index:
+            return "<i>no point selected yet</i>"
+        obj_id = scatter_df.iloc[index[0]][id_col]
+        return f"<b>selected {id_col}:</b> {obj_id}"
+
+    selected_id_panel = pn.pane.HTML(pn.bind(_selected_id_text, index=selection.param.index))
+
     def render_lc(index, fold, show_err):
         if not index:
             info.object = "<i>click a point in the left panel</i>"
-            return _empty_lc_overlay(bands, "no object selected", "MJD", lc_ylabel, lc_invert)
+            return _empty_lc_overlay(bands, "no object selected", "MJD", lc_ylabel, lc_invert, show_err)
 
         obj_id = scatter_df.iloc[index[0]][id_col]
+        period = None
+        if has_period:
+            match = scatter_df.loc[scatter_df[id_col] == obj_id, period_col]
+            if len(match) and pd.notna(match.iloc[0]):
+                period = float(match.iloc[0])
+
         try:
-            lc = _fetch_lightcurve(lc_df, obj_id, id_col, nested_col, time_col, mag_col, magerr_col, band_col)
+            overlay = plot_lightcurve(
+                lc_df, obj_id, id_col=id_col, bands=bands, nested_col=nested_col,
+                time_col=time_col, mag_col=mag_col, magerr_col=magerr_col, band_col=band_col,
+                period=period, fold=fold, show_err=show_err,
+            )
         except Exception as exc:
             # panel doesn't surface exceptions raised inside a bound callback anywhere in the
             # notebook by default — same footgun the plotly version hit with ipywidgets. Surface
             # it in the info panel before re-raising so it isn't silently swallowed.
             info.object = f"<b style='color:#b00'>Error rendering diaObjectId={obj_id}: {type(exc).__name__}: {exc}</b>"
             raise
-
-        period = None
-        if has_period:
-            match = scatter_df.loc[scatter_df[id_col] == obj_id, period_col]
-            if len(match) and pd.notna(match.iloc[0]):
-                period = float(match.iloc[0])
-        do_fold = fold and period is not None and period > 0
-
-        curves = {}
-        for b in bands:
-            sel = lc[band_col] == b
-            t = lc.loc[sel, time_col].to_numpy()
-            mag = lc.loc[sel, mag_col].to_numpy()
-            magerr = lc.loc[sel, magerr_col].to_numpy()
-            x = (t / period) % 1.0 if do_fold else t
-            band_df = pd.DataFrame({"x": x, "y": mag, "err": magerr})
-            scatter_el = hv.Scatter(band_df, "x", "y").opts(color=BAND_COLORS.get(b), size=6)
-            if show_err and len(band_df):
-                curves[b] = hv.ErrorBars(band_df, "x", ["y", "err"]).opts(color=BAND_COLORS.get(b)) * scatter_el
-            else:
-                curves[b] = scatter_el
-
-        title = f"diaObjectId={obj_id}" + (f", period={period:.3f} d" if do_fold else "")
-        xlabel = "phase" if do_fold else "MJD"
-        overlay = hv.NdOverlay(curves, kdims="band").opts(
-            opts.NdOverlay(
-                width=560, height=460, title=title, xlabel=xlabel, ylabel=lc_ylabel,
-                legend_position="right", invert_yaxis=lc_invert,
-            )
-        )
 
         period_text = f" | period={period:.3f} d" if period is not None else " | no period available"
         info.object = f"<b>diaObjectId={obj_id}</b>{period_text if has_period else ''}"
@@ -209,5 +282,5 @@ def interactive_scatter_lc(
     lc_dmap = hv.DynamicMap(pn.bind(render_lc, index=selection.param.index, fold=fold_toggle, show_err=err_toggle))
 
     controls = [err_toggle] if not has_period else [fold_toggle, err_toggle]
-    right_panel = pn.Column(info, pn.Row(*controls), lc_dmap)
+    right_panel = pn.Column(selected_id_panel, info, pn.Row(*controls), lc_dmap)
     return pn.Row(points, right_panel)

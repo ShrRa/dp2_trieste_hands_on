@@ -1,5 +1,102 @@
 # Changelog
 
+## 2026-09-03 (3)
+
+- Made `datapaths` optional for `notebooks/05_interactive_explorer.ipynb`, per the user's plan
+  that the workshop will only run nb_05 itself, not nb_01-04 — so attendees won't be running the
+  notebooks that write/register artifacts, and installing `datapaths` just to *read* the
+  already-built `dia_object_lc_hq` collection has no payoff for them.
+  - The setup cell now tries `datapaths` first (so it still works unchanged for anyone who has
+    it configured), and falls back to `dia_object_lc_hq`'s well-known shared path
+    (`Path.home() / "share" / "trieste" / "dia_object_lc_hq"`) on any exception — not just
+    `ImportError`, since an uninstalled `roots.local.yaml` (which nb_05 attendees also won't
+    have) fails inside `Datapaths()` itself, not at import time. That path matches what
+    `datapaths` itself resolves `dp2_subset` to (confirmed against this session's own
+    `configs/roots.local.yaml` and `configs/artifacts_registry.yaml`), and works for any RSP
+    user's home without per-user configuration, so no separate path needs to be documented.
+  - Verified directly: `lsdb.open_catalog(Path.home() / "share" / "trieste" /
+    "dia_object_lc_hq")` opens the real 4,445-partition collection with no `datapaths` import at
+    all.
+  - Updated the notebook's intro markdown and README's Setup section (nb_05 no longer needs its
+    own subsection there) to say installing `datapaths` is only needed for nb_01-04.
+
+## 2026-09-03 (2)
+
+- Found and fixed a second, worse instance of the same NdOverlay-type-mismatch bug class from
+  the entry below, plus added a click-independent failsafe, per the user's report that the
+  click no longer errors but the light curve still doesn't show (suspected stale `bokeh`/`panel`
+  browser comm needing a reload — can't be confirmed without a live RSP session).
+  - **Second instance**: `render_lc`'s "no selection yet" placeholder (`_empty_lc_overlay`)
+    always built plain `hv.Scatter` per band, while a real selection with `show_err=True` builds
+    `hv.Overlay`. Both are frames of the *same* `hv.DynamicMap`, and holoviews requires
+    homogeneous element types across a `DynamicMap`'s successive frames just as it does across
+    one `NdOverlay`'s keys — so the very first click (transitioning from the empty frame to a
+    real one), or clicking blank space to deselect (transitioning back), hit the same class of
+    crash the prior entry's fix didn't cover. Reproduced directly: simulating a deselect click
+    right after a real one raised `AttributeError: 'Scatter' object has no attribute 'items'` in
+    holoviews' stream-triggered frame update, against the real RSP `holoviews` install.
+  - **Fix, structural this time rather than another one-off patch**: every band's element is now
+    unconditionally `hv.ErrorBars(...) * hv.Scatter(...)` (an `hv.Overlay`) in every state — a
+    band with no data, `show_err` on or off, and the empty-selection placeholder all build the
+    identical type now. `show_err` only toggles the `ErrorBars` layer's `visible` option instead
+    of whether it's present at all, so no code path can reintroduce a type mismatch by
+    construction. Applied identically in the new `plot_lightcurve` (below) and
+    `_empty_lc_overlay`.
+  - **Added `plot_lightcurve(lc_df, obj_id, ..., period=None, fold=False, show_err=True)`**
+    (`src/visualization/lc_explorer.py`, exported from `src/visualization/__init__.py`): the
+    same per-object light-curve plot as `interactive_scatter_lc`'s click handler, as a plain
+    function call — no click, stream, or `panel` widget involved — so it works standalone in its
+    own notebook cell regardless of whatever state the interactive widget's `bokeh`/`panel` comm
+    is in. `fold` is an explicit parameter here (not a toggle), since there's no widget to bind
+    one to. `render_lc` now calls this function internally too, rather than duplicating the
+    curve-building logic, so the interactive and manual paths can't drift apart.
+  - **Added an independent "selected id" panel** to `interactive_scatter_lc`'s right column,
+    bound straight to the click stream's index and displayed above the light-curve panel —
+    deliberately *not* wired through `render_lc`/`lc_dmap`, so it keeps showing which
+    `diaObjectId` was clicked even if the light-curve panel itself stops refreshing. The intended
+    workflow when that happens: read the id off this panel, call `plot_lightcurve` with it in a
+    separate cell.
+  - Updated nb_05 to import `plot_lightcurve` and added a demo cell after the CMD example showing
+    the manual-fallback workflow (paste an id, call `plot_lightcurve` with `fold=False`/`True`).
+  - **Verified** against the real RSP `holoviews`/`bokeh`/`panel` install (not a synthetic
+    substitute): built `interactive_scatter_lc` against synthetic objects with deliberately
+    partial band coverage and both a period and no period, then drove it entirely
+    programmatically — simulated clicks (including click → click → deselect, the exact sequence
+    that reproduced the second bug above), and both the fold and show-flux-errors toggles after a
+    selection was already showing — all rendered through `hv.renderer("bokeh").get_plot(...)`
+    without error. Also called `plot_lightcurve` standalone (folded, unfolded, object with data,
+    object with none) and confirmed it plots correctly. Did not `nbconvert --execute` nb_05
+    itself, since it reads the same `dia_object_lc_hq` collection nb_04 was actively writing to
+    at the time — avoided the concurrent read against that collection rather than risk
+    interfering with nb_04's in-progress run. nb_05's own live-click behavior in JupyterLab still
+    needs the user's confirmation, same standing caveat as always.
+
+## 2026-09-03
+
+- Diagnosed and fixed the user's real `AttributeError: 'Overlay' object has no attribute
+  'extents'` on clicking a scatter point in nb_05's `interactive_scatter_lc`
+  (`src/visualization/lc_explorer.py`). Root cause: `render_lc`'s per-band `curves` dict, fed
+  into one `hv.NdOverlay(curves, kdims="band")`, mixed `hv.Scatter` (bands with zero data points
+  for the clicked object) and `hv.Overlay` (`ErrorBars * Scatter`, bands with data) whenever
+  "show flux errors" was on — `curves[b]` only became an `Overlay` under `if show_err and
+  len(band_df)`, so any object with data in some but not all of `bands` (the normal case, e.g.
+  no `u`-band detections) produced a heterogeneous `NdOverlay`. `holoviews` requires all values
+  under one `NdOverlay` key dimension to share a type; reproduced directly against the RSP
+  kernel's actual `holoviews` install as `AssertionError: NdOverlay must only contain one type
+  of object, not both Overlay and Scatter` when constructed directly — the live-click path
+  apparently reaches a different internal code branch (range/extents computation across
+  `DynamicMap` frames) that surfaces the same underlying type mismatch as the `AttributeError`
+  the user hit instead of that assertion, but the defect and fix are the same either way.
+  - Fix: drop the `len(band_df)` condition so every band gets the same `Overlay` type
+    (`ErrorBars * Scatter`) whenever `show_err` is on, regardless of whether that particular
+    band has data for the clicked object — an empty `ErrorBars` just draws nothing.
+  - Verified against the real RSP `holoviews`/`bokeh` install (not a synthetic substitute): the
+    pre-fix code reproducibly hit the type-mismatch assertion for an object with partial band
+    coverage plus `show_err=True`; the post-fix code builds a homogeneous `NdOverlay` and
+    compiles through `hv.renderer("bokeh").get_plot(...)` without error for the same case.
+    Live-click confirmation in JupyterLab still needed from the user, per this repo's standing
+    caveat that `interactive_scatter_lc`'s click behavior can't be verified non-interactively.
+
 ## 2026-09-02 (2)
 
 - Fixed a real failure the user hit running nb_04 for real: `write_catalog(tmp_path,

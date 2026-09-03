@@ -6,7 +6,13 @@ workshop (August 2026). See `docs/SPEC_V01.md` for the full scope and rough plan
 ## Setup
 
 The notebooks are meant to run on the Rubin Science Platform (RSP), whose `lsst-scipipe`
-kernel already provides `lsdb`/`hats`/`nested-pandas` etc. The only extra package needed is
+kernel already provides `lsdb`/`hats`/`nested-pandas` etc. **If you're only running
+`05_interactive_explorer.ipynb`** (the workshop's actual hands-on notebook — nb_01-04 build the
+`dia_object_lc_hq` collection it reads, but you don't need to re-run them or install anything
+extra to just read it), skip the rest of this section; nb_05 falls back to that collection's
+known shared path on its own.
+
+nb_01-04 (and re-registering artifacts of your own) need one extra package,
 [`datapaths`](https://github.com/ShrRa/datapaths), which manages where each notebook's inputs
 and outputs live without hardcoding machine-specific paths:
 
@@ -103,7 +109,13 @@ nb_02-05 each start by picking a small slice of the HQ sample (one partition or 
   `holoviews` + `bokeh` + `panel` — all three ship in the RSP `lsst-scipipe` kernel already, no
   extra install needed; needs a live Jupyter kernel to actually click (not verified outside
   JupyterLab on RSP). `lc_df` still has to be materialized up front, so this one uses a slice
-  of the HQ sample as its actual working dataset, not just a look-and-discard sample.
+  of the HQ sample as its actual working dataset, not just a look-and-discard sample. Doesn't
+  need `datapaths` either — it only reads the already-built `dia_object_lc_hq`, falling back to
+  its known shared path directly if `datapaths` isn't installed/configured. Also has a
+  non-interactive fallback, `plot_lightcurve` (same module): a plain function call that plots
+  one object's light curve given its id, for when the click-driven widget itself misbehaves
+  (e.g. needs a browser reload) — the widget shows the clicked object's id independently of the
+  light-curve panel for exactly this reason.
 
 `src/visualization/` holds reusable plotting code shared across notebooks (currently just
 `lc_explorer.py`); `src/dataio/` holds `select_slice` (`hq_sample.py`), used by nb_02-05.
