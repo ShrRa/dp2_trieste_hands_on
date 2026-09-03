@@ -72,24 +72,26 @@ artifacts:
     updated_by: shrra-ung
   dia_object_lc_hq:
     format: hats-collection
-    hash: sha256:6ecedecdc76ebef8dbe662424de91998d0ab07babe0dd0451fcefb88b96a8fa5
+    hash: sha256:fd42511c0d77cac383866313213f95db3e3b03db6026d3bca352b1b1882b2d4e
     inputs: []
-    notes: nb_01's base HQ sample plus nb_02's LC stats, plus {band}_mag_median (per
-      band, median diaObjectForcedSource.psfMag, quality-flagged rows excluded, >=5
-      points required) and max_reliability (max diaSource.reliability) columns, from
-      nb_03.
+    notes: 'nb_01''s base HQ sample plus nb_02''s stats and nb_03''s magnitudes, plus
+      {band}_period_days/{band}_period_power (per band, Lomb-Scargle on diaSource.scienceMag,
+      >=10 points required, max period = duration_days/2), best_period_days/best_period_power
+      (highest-power band), and periodogram_peaks (nested: band/rank/period_days/power,
+      top-5 local maxima per band, for alias-checking), from nb_04.'
     path: dia_object_lc_hq/collection.properties
     root: dp2_subset
     tags:
-    - cmd
     - diaobject
     - dp2
-    - forced-photometry
     - hq
+    - lomb-scargle
     - nb01
     - nb02
     - nb03
+    - nb04
+    - periods
     type: dp2_subset
-    updated_at: '2026-09-02T09:29:24+00:00'
+    updated_at: '2026-09-02T23:15:59+00:00'
     updated_by: shrra-ung
 registry_version: 1
